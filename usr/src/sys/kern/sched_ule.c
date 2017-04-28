@@ -246,11 +246,17 @@ struct tdq {
 	struct runq	tdq_realtime;		/* real-time run queue. */
 	struct runq	tdq_timeshare;		/* timeshare run queue. */
 	struct runq	tdq_idle;		/* Queue of IDLE threads. */
+
+	/* Our user-level lottery queues */
+	struct runq ltq_interactive;
+	struct runq ltq_timeshare;
+	struct runq ltq_idle;
+
 	char		tdq_name[TDQ_NAME_LEN];
 #ifdef KTR
 	char		tdq_loadname[TDQ_LOADNAME_LEN];
 #endif
-} __aligned(64);
+} __aligned(64); // END TDQ
 
 /* Idle thread states and config. */
 #define	TDQ_RUNNING	1
@@ -459,7 +465,9 @@ tdq_runq_add(struct tdq *tdq, struct thread *td, int flags)
 	TDQ_LOCK_ASSERT(tdq, MA_OWNED);
 	THREAD_LOCK_ASSERT(td, MA_OWNED);
 
+	// Priority of this thread
 	pri = td->td_priority;
+	// Thread struct taht has extra fields.
 	ts = td->td_sched;
 	TD_SET_RUNQ(td);
 	if (THREAD_CAN_MIGRATE(td)) {
@@ -493,6 +501,7 @@ tdq_runq_add(struct tdq *tdq, struct thread *td, int flags)
 		return;
 	} else
 		ts->ts_runq = &tdq->tdq_idle;
+	// Adding to a specific runq
 	runq_add(ts->ts_runq, td, flags);
 }
 
@@ -1341,6 +1350,10 @@ tdq_setup(struct tdq *tdq)
 	runq_init(&tdq->tdq_realtime);
 	runq_init(&tdq->tdq_timeshare);
 	runq_init(&tdq->tdq_idle);
+	// Add our user queues here.
+	runq_init(&tdq->ltq_interactive);
+	runq_init(&tdq->ltq_timeshare);
+	runq_init(&tdq->ltq_idle);
 	snprintf(tdq->tdq_name, sizeof(tdq->tdq_name),
 	    "sched lock %d", (int)TDQ_ID(tdq));
 	mtx_init(&tdq->tdq_lock, tdq->tdq_name, "sched lock",
