@@ -63,6 +63,8 @@ __FBSDID("$FreeBSD: releng/10.3/sys/kern/sched_ule.c 288463 2015-10-01 21:54:43Z
 #include <sys/vmmeter.h>
 #include <sys/cpuset.h>
 #include <sys/sbuf.h>
+// Add debug levels for syscall
+#include <sys/syslog.h>
 
 #ifdef HWPMC_HOOKS
 #include <sys/pmckern.h>
@@ -363,6 +365,21 @@ SDT_PROBE_DEFINE(sched, , , on__cpu);
 SDT_PROBE_DEFINE(sched, , , remain__cpu);
 SDT_PROBE_DEFINE2(sched, , , surrender, "struct thread *", 
     "struct proc *");
+
+
+
+
+/*
+ * Code for gift Syscall
+ */
+int sys_gift(struct thread *td, struct gift_args *args) {
+	log(LOG_DEBUG, "Gifting %d tickets from %d to %d\n", args->t, args->pid, td->td_ucred->cr_uid);
+	// Todo: Actual implementation
+	return 13;
+}
+
+
+
 
 /*
  * Print the threads waiting on a run-queue.
