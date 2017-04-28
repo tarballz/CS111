@@ -382,10 +382,12 @@ int sys_gift(struct thread *td, struct gift_args *args) {
 	//int giver_threads = 0;
 	uint64_t giver_tickets_total = 0;
 	uint64_t tickets_to_give = args->t;
+	int giver_threads = 0;
 	// Count how many tickets the giver can give (to make sure its enough)
 	FOREACH_THREAD_IN_PROC(giver, g_td) {
 		thread_lock(g_td);
 		giver_tickets_total += g_td->tickets - 1;
+		giver_threads++;
 		thread_unlock(g_td);
 	}
 
@@ -439,12 +441,20 @@ int sys_gift(struct thread *td, struct gift_args *args) {
 
 
 	// Remove Tickets from the giver
-	// Uses greedy policy where it takes as many tickets as possible from each thread until it has enough
+	// Communist distribuition policy. The giving process pools all its tickets
+	// then subtracts the amount it gives away. Finally it gives all its threads
+	// an approximatly equal number of tickets from the remaining pool
+	uint64_t leftover_tickets = giver_tickets_total - tickets_to_give;
+	tickets_per_thread = leftover_tickets / giver_threads;
+	extra_tickets = leftover_tickets % giver_threads;
 	FOREACH_THREAD_IN_PROC(giver, g_td) {
-	     if (tickets_to_give > 0 && g_td->tickets > 1) {
-	         tickets_to_give -= (g_td->tickets - 1);
-	         g_td->tickets = 1;
+	     thread_lock(r_td);
+	     g_td->tickets = tickets_per_thread;
+	     if (extra_tickets > 0) {
+	       g_td->tickets++;
+	       extra_tickets--;
 	     }
+	     thread_unlock(r_td);
 	}
 
 
