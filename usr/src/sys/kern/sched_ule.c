@@ -247,7 +247,7 @@ struct tdq {
 	struct runq	tdq_timeshare;		/* timeshare run queue. */
 	struct runq	tdq_idle;		/* Queue of IDLE threads. */
 
-	/* Our user-level lottery queues */
+	/* Our user-level lottery queues. */
 	struct runq ltq_interactive;
 	struct runq ltq_timeshare;
 	struct runq ltq_idle;
