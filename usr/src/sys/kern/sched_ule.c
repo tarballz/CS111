@@ -374,18 +374,33 @@ SDT_PROBE_DEFINE2(sched, , , surrender, "struct thread *",
  */
 int sys_gift(struct thread *td, struct gift_args *args) {
 	log(LOG_DEBUG, "Gifting %d tickets to pid %d from a %d process.\n", args->t, args->pid, td->td_ucred->cr_uid);
-
-	/* 
-	 * TODO: gift(0,0) which needs to return the total amount of tickets
-	 *       available to give away.  Which should be giver_total_tickets - giver_total_threads
-	 *		 since every thread must have at least 1 ticket.
-	 */
-
-
-
+     
 	// Thread and process doing the giving.
 	struct thread *g_td;
 	struct proc *giver = td->td_proc; 
+
+	//int giver_threads = 0;
+	uint64_t giver_tickets_total = 0;
+	uint64_t tickets_to_give = args->t;
+	// Count how many tickets the giver can give (to make sure its enough)
+	FOREACH_THREAD_IN_PROC(giver, g_td) {
+		thread_lock(g_td);
+		giver_tickets_total += g_td->tickets - 1;
+		thread_unlock(g_td);
+	}
+
+	// gift(0, 0)
+	// This is how you return a value from a systemcall
+	// The actual return value is the error code
+	if(args->pid == 0 && args->t == 0) {
+	       td->td_retval[0] = tickets_to_give;
+	       return 0;
+	}
+
+	
+	if (tickets_to_give > giver_tickets_total) {
+	  return 1; // Not entirly sure which error codes we should be returning
+	}
 
 	// Thread and process to gift to.
 	struct thread *r_td;
@@ -393,27 +408,10 @@ int sys_gift(struct thread *td, struct gift_args *args) {
 	r_td = FIRST_THREAD_IN_PROC(receiver);
 
 	if (td->td_ucred->cr_uid == 0 || r_td->td_ucred->cr_uid == 0) {
-		return -1;
+		return 2;
 	}
 
-	//int giver_threads = 0;
-	uint64_t giver_tickets_total = 0;
-	uint64_t tickets_to_give = args->t;
-	// Taking tickets away from the "giver" process.
-	FOREACH_THREAD_IN_PROC(giver, g_td) {
-		thread_lock(g_td);
-		//giver_threads += 1;
-		giver_tickets_total += g_td->tickets;
-		if (tickets_to_give > 0 && g_td->tickets > 1) {
-			tickets_to_give -= (g_td->tickets - 1);
-			g_td->tickets = 1;
-		}
-		thread_unlock(g_td);
-	}
-	if (tickets_to_give > giver_tickets_total) {
-		perror("Insufficient tickets.").
-		return -1;
-	}
+
 	// Giving tickets to the "receiver" process.
 	int receiver_threads = 0;
 	FOREACH_THREAD_IN_PROC(receiver, r_td) {
@@ -421,14 +419,40 @@ int sys_gift(struct thread *td, struct gift_args *args) {
 		receiver_threads++;
 		thread_unlock(r_td);
 	}
-	// TODO: Actually dole out the tickets.
+
+	// Give tickets to the recive
+	// Try to give an equal amount of tickets to each of the reciving processes threads
+	// If their are left over tickets (Eg tickes/ threads is not even) give them out
+	// sequentially one at a time. So fi there are 5 tickets and 3 threads the first
+	// two threads gets2 tickets and the last gets 1.
+	int tickets_per_thread = tickets_to_give / receiver_threads;
+	int extra_tickets = tickets_to_give % receiver_threads;
+	FOREACH_THREAD_IN_PROC(receiver, r_td) {
+		thread_lock(r_td);
+		r_td->tickets += tickets_per_thread;
+		if (extra_tickets > 0) {
+		  r_td->tickets++;
+		  extra_tickets--;
+		}
+		thread_unlock(r_td);
+	}
 
 
-	printf("Tickets to give: %lu\n", tickets);
+	// Remove Tickets from the giver
+	// Uses greedy policy where it takes as many tickets as possible from each thread until it has enough
+	FOREACH_THREAD_IN_PROC(giver, g_td) {
+	     if (tickets_to_give > 0 && g_td->tickets > 1) {
+	         tickets_to_give -= (g_td->tickets - 1);
+	         g_td->tickets = 1;
+	     }
+	}
+
+
+	printf("Tickets to give: %lu\n", giver_tickets_total);
 	printf("Calling thread:\nPID: %d\nTickets: %lu\n", giver->p_pid, td->tickets);
 	printf("\nReceiver Process:\nTickets: %lu\n", giver_tickets_total);
 
-	return 13;
+	return 0;
 }
 
 
