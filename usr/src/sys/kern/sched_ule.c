@@ -373,6 +373,7 @@ SDT_PROBE_DEFINE2(sched, , , surrender, "struct thread *",
  * Code for gift Syscall
  */
 int sys_gift(struct thread *td, struct gift_args *args) {
+	log(LOG_DEBUG, "REV B\n");
 	log(LOG_DEBUG, "Gifting %d tickets to pid %d from a %d process.\n", args->t, args->pid, td->td_ucred->cr_uid);
      
 	// Thread and process doing the giving.
@@ -383,6 +384,8 @@ int sys_gift(struct thread *td, struct gift_args *args) {
 	uint64_t giver_tickets_total = 0;
 	uint64_t tickets_to_give = args->t;
 	int giver_threads = 0;
+
+	log(LOG_DEBUG, "CP0\n");
 	// Count how many tickets the giver can give (to make sure its enough)
 	FOREACH_THREAD_IN_PROC(giver, g_td) {
 		thread_lock(g_td);
@@ -391,12 +394,19 @@ int sys_gift(struct thread *td, struct gift_args *args) {
 		thread_unlock(g_td);
 	}
 
+	log(LOG_DEBUG, "%d ticks avail\n", (int) giver_tickets_total);
+
+	
+	log(LOG_DEBUG, "CP1\n");
+
+
 	// gift(0, 0)
 	// This is how you return a value from a systemcall
 	// The actual return value is the error code
 	if(args->pid == 0 && args->t == 0) {
-	       td->td_retval[0] = tickets_to_give;
-	       return 0;
+		log(LOG_DEBUG, "gift(0,0)\n");
+    	td->td_retval[0] = giver_tickets_total;
+    	return 0;
 	}
 
 	
@@ -404,13 +414,19 @@ int sys_gift(struct thread *td, struct gift_args *args) {
 	  return 1; // Not entirly sure which error codes we should be returning
 	}
 
+	log(LOG_DEBUG, "CP2\n");
+
 	// Thread and process to gift to.
 	struct thread *r_td;
 	struct proc *receiver = pfind(args->pid);
+	//if (*proc == 0)
+	//	return 2;
+
+
 	r_td = FIRST_THREAD_IN_PROC(receiver);
 
 	if (td->td_ucred->cr_uid == 0 || r_td->td_ucred->cr_uid == 0) {
-		return 2;
+		return 3;
 	}
 
 
@@ -421,6 +437,8 @@ int sys_gift(struct thread *td, struct gift_args *args) {
 		receiver_threads++;
 		thread_unlock(r_td);
 	}
+
+	log(LOG_DEBUG, "CP3\n");
 
 	// Give tickets to the recive
 	// Try to give an equal amount of tickets to each of the reciving processes threads
@@ -436,8 +454,12 @@ int sys_gift(struct thread *td, struct gift_args *args) {
 		  r_td->tickets++;
 		  extra_tickets--;
 		}
+		log(LOG_DEBUG, "r tks %d\n", (int) r_td->tickets);
+
 		thread_unlock(r_td);
 	}
+
+	log(LOG_DEBUG, "CP4\n");
 
 
 	// Remove Tickets from the giver
@@ -448,20 +470,21 @@ int sys_gift(struct thread *td, struct gift_args *args) {
 	tickets_per_thread = leftover_tickets / giver_threads;
 	extra_tickets = leftover_tickets % giver_threads;
 	FOREACH_THREAD_IN_PROC(giver, g_td) {
-	     thread_lock(r_td);
+		log(LOG_DEBUG, "CP4.1\n");
+	     thread_lock(g_td);
 	     g_td->tickets = tickets_per_thread;
+	     log(LOG_DEBUG, "CP4.2\n");
 	     if (extra_tickets > 0) {
 	       g_td->tickets++;
 	       extra_tickets--;
 	     }
-	     thread_unlock(r_td);
+	     log(LOG_DEBUG, "g tks %d\n", (int) g_td->tickets);
+	     log(LOG_DEBUG, "CP4.3\n");
+	     thread_unlock(g_td);
+	     log(LOG_DEBUG, "CP4.4\n");
 	}
 
-
-	printf("Tickets to give: %lu\n", giver_tickets_total);
-	printf("Calling thread:\nPID: %d\nTickets: %lu\n", giver->p_pid, td->tickets);
-	printf("\nReceiver Process:\nTickets: %lu\n", giver_tickets_total);
-
+	log(LOG_DEBUG, "CP5\n");
 	return 0;
 }
 
