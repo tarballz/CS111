@@ -512,7 +512,7 @@ tdq_runq_add(struct tdq *tdq, struct thread *td, int flags)
 		return;
 	} else {
 		// All else fails, set thread's q prop to idle
-		if (td->td_ucred->cr_ruid != 0) {
+		if (td->td_ucred->cr_uid != 0) {
 			ts->ts_runq = &tdq->ltq_idle;
 		} else {
 			ts->ts_runq = &tdq->tdq_idle; 
