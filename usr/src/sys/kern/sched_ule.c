@@ -246,11 +246,17 @@ struct tdq {
 	struct runq	tdq_realtime;		/* real-time run queue. */
 	struct runq	tdq_timeshare;		/* timeshare run queue. */
 	struct runq	tdq_idle;		/* Queue of IDLE threads. */
+
+	/* Our user-level lottery queues. */
+	struct runq ltq_interactive;
+	struct runq ltq_timeshare;
+	struct runq ltq_idle;
+
 	char		tdq_name[TDQ_NAME_LEN];
 #ifdef KTR
 	char		tdq_loadname[TDQ_LOADNAME_LEN];
 #endif
-} __aligned(64);
+} __aligned(64); // END TDQ
 
 /* Idle thread states and config. */
 #define	TDQ_RUNNING	1
@@ -459,7 +465,9 @@ tdq_runq_add(struct tdq *tdq, struct thread *td, int flags)
 	TDQ_LOCK_ASSERT(tdq, MA_OWNED);
 	THREAD_LOCK_ASSERT(td, MA_OWNED);
 
+	// Priority of this thread
 	pri = td->td_priority;
+	// Thread struct that has extra fields.
 	ts = td->td_sched;
 	TD_SET_RUNQ(td);
 	if (THREAD_CAN_MIGRATE(td)) {
@@ -467,9 +475,20 @@ tdq_runq_add(struct tdq *tdq, struct thread *td, int flags)
 		ts->ts_flags |= TSF_XFERABLE;
 	}
 	if (pri < PRI_MIN_BATCH) {
-		ts->ts_runq = &tdq->tdq_realtime;
+		// Set thread's q prop to realtime
+		if (td->td_ucred->cr_uid != 0) {
+			// Add to lottery realtime
+			ts->ts_runq = &tdq->ltq_interactive;
+		} else {
+			ts->ts_runq = &tdq->tdq_realtime;
+		}
 	} else if (pri <= PRI_MAX_BATCH) {
-		ts->ts_runq = &tdq->tdq_timeshare;
+		// Set thread's q prop to timeshare
+		if (td->td_ucred->cr_uid != 0) {
+			ts->ts_runq = &tdq->ltq_timeshare;
+		} else {
+			ts->ts_runq = &tdq->tdq_timeshare;
+		}
 		KASSERT(pri <= PRI_MAX_BATCH && pri >= PRI_MIN_BATCH,
 			("Invalid priority %d on timeshare runq", pri));
 		/*
@@ -491,8 +510,15 @@ tdq_runq_add(struct tdq *tdq, struct thread *td, int flags)
 			pri = tdq->tdq_ridx;
 		runq_add_pri(ts->ts_runq, td, pri, flags);
 		return;
-	} else
-		ts->ts_runq = &tdq->tdq_idle;
+	} else {
+		// All else fails, set thread's q prop to idle
+		if (td->td_ucred->cr_ruid != 0) {
+			ts->ts_runq = &tdq->ltq_idle;
+		} else {
+			ts->ts_runq = &tdq->tdq_idle; 
+		}
+	}
+	// Adding to a specific runq.
 	runq_add(ts->ts_runq, td, flags);
 }
 
@@ -1308,20 +1334,43 @@ tdq_choose(struct tdq *tdq)
 	struct thread *td;
 
 	TDQ_LOCK_ASSERT(tdq, MA_OWNED);
+	// Checking Standard Interactive.
 	td = runq_choose(&tdq->tdq_realtime);
 	if (td != NULL)
 		return (td);
+	// Checking Standard Timeshare.
 	td = runq_choose_from(&tdq->tdq_timeshare, tdq->tdq_ridx);
 	if (td != NULL) {
 		KASSERT(td->td_priority >= PRI_MIN_BATCH,
-		    ("tdq_choose: Invalid priority on timeshare queue %d",
+		    ("tdq_choose: Invalid priority on STANDARD timeshare queue %d",
 		    td->td_priority));
 		return (td);
 	}
+	// Checking Lottery Interactive.
+	td = runq_choose(&tdq->ltq_interactive);
+	if (td != NULL)
+		return (td);
+	// Checking Lottery Timeshare.
+	td = runq_choose_from(&tdq->ltq_timeshare, tdq->tdq_ridx);
+	if (td != NULL) {
+		KASSERT(td->td_priority >= PRI_MIN_BATCH,
+		    ("tdq_choose: Invalid priority on LOTTERY timeshare queue %d",
+		    td->td_priority));
+		return (td);
+	}
+	// Checking Standard Idle.
 	td = runq_choose(&tdq->tdq_idle);
 	if (td != NULL) {
 		KASSERT(td->td_priority >= PRI_MIN_IDLE,
-		    ("tdq_choose: Invalid priority on idle queue %d",
+		    ("tdq_choose: Invalid priority on STANDARD idle queue %d",
+		    td->td_priority));
+		return (td);
+	}
+	// Checking Lottery Idle.
+	td = runq_choose(&tdq->ltq_idle);
+	if (td != NULL) {
+		KASSERT(td->td_priority >= PRI_MIN_IDLE,
+		    ("tdq_choose: Invalid priority on LOTTERY idle queue %d",
 		    td->td_priority));
 		return (td);
 	}
@@ -1341,6 +1390,10 @@ tdq_setup(struct tdq *tdq)
 	runq_init(&tdq->tdq_realtime);
 	runq_init(&tdq->tdq_timeshare);
 	runq_init(&tdq->tdq_idle);
+	// Add our user queues here.
+	runq_init(&tdq->ltq_interactive);
+	runq_init(&tdq->ltq_timeshare);
+	runq_init(&tdq->ltq_idle);
 	snprintf(tdq->tdq_name, sizeof(tdq->tdq_name),
 	    "sched lock %d", (int)TDQ_ID(tdq));
 	mtx_init(&tdq->tdq_lock, tdq->tdq_name, "sched lock",

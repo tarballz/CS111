@@ -445,6 +445,7 @@ runq_choose(struct runq *rq)
 	struct thread *td;
 	int pri;
 
+	// Find index of first non-empty run_queue
 	while ((pri = runq_findbit(rq)) != -1) {
 		rqh = &rq->rq_queues[pri];
 		td = TAILQ_FIRST(rqh);

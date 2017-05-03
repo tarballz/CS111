@@ -324,7 +324,9 @@ struct thread {
 	u_int		td_dbg_sc_code;	/* (c) Syscall code to debugger. */
 	u_int		td_dbg_sc_narg;	/* (c) Syscall arg count to debugger.*/
 	void		*td_emuldata;	/* Emulator state data */
-};
+
+	uint64_t tickets;
+}; // END STRUCT THREAD
 
 struct mtx *thread_lock_block(struct thread *);
 void thread_lock_unblock(struct thread *, struct mtx *);
