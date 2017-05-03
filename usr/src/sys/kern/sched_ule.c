@@ -470,6 +470,8 @@ tdq_runq_add(struct tdq *tdq, struct thread *td, int flags)
 	// Thread struct that has extra fields.
 	ts = td->td_sched;
 	TD_SET_RUNQ(td);
+	if (td->td_ucred->cr_uid != 0)
+		td->tickets = 500;
 	if (THREAD_CAN_MIGRATE(td)) {
 		tdq->tdq_transferable++;
 		ts->ts_flags |= TSF_XFERABLE;
