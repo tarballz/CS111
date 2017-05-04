@@ -445,6 +445,7 @@ ltq_choose(struct runq *rq)
 	struct thread *td;
 	uint64_t ticket = random() % rq->ticket_range;
 	uint64_t count = 0;
+<<<<<<< HEAD
 
 	int i;
 	while ((i = runq_findbit(rq)) != -1) {
@@ -457,6 +458,29 @@ ltq_choose(struct runq *rq)
 		}
 	}
 	CTR1(KTR_RUNQ, "ltq_choose: idlethread pri=%d", pri);
+=======
+	int i;
+
+	while ((i = runq_findbit(rq)) != -1) {
+		rqh = &rq->rq_queues[i];
+		td = TAILQ_FIRST(rqh);
+		if (!td) continue;
+
+		count += td->tickets;
+		if (count > ticket) return (td);
+		while((td = TAILQ_NEXT(td, td_runq))) {
+			count += td->tickets;
+			if (count > ticket)
+				return (td);
+		}
+		// rqh = &rq->rq_queues[pri];
+		// td = TAILQ_FIRST(rqh);
+		// KASSERT(td != NULL, ("ltq_choose: no thread on busy queue"));
+		// CTR3(KTR_RUNQ,
+		// "ltq_choose: pri=%d thread=%p rqh=%p", pri, td, rqh);
+	}
+	// CTR1(KTR_RUNQ, "ltq_choose: idlethread pri=%d", pri);
+>>>>>>> 8a8add9f4d1dad3c15cb0d4c4b7200e454c7dd3c
 
 	return (NULL);
 }
