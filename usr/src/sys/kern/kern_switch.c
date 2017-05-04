@@ -438,25 +438,29 @@ runq_choose_fuzz(struct runq *rq, int fuzz)
 	return (NULL);
 }
 
-// struct thread *
-// ltq_choose(struct runq *rq)
-// {
-// 	struct rqhead *rqh;
-// 	struct thread *td;
-// 	int pri;
+struct thread *
+ltq_choose(struct runq *rq)
+{
+	struct rqhead *rqh;
+	struct thread *td;
+	uint64_t ticket = random() % rq->ticket_range;
+	uint64_t count = 0;
 
-// 	while ((pri = runq_findbit(rq)) != -1) {
-// 		rqh = &rq->rq_queues[pri];
-// 		td = TAILQ_FIRST(rqh);
-// 		KASSERT(td != NULL, ("ltq_choose: no thread on busy queue"));
-// 		CTR3(KTR_RUNQ,
-// 		    "ltq_choose: pri=%d thread=%p rqh=%p", pri, td, rqh);
-// 		return (td);
-// 	}
-// 	CTR1(KTR_RUNQ, "ltq_choose: idlethread pri=%d", pri);
+	int i;
+	while ((i = runq_findbit(rq)) != -1) {
+		rqh = &rq->rq_queues[i];
+		TAILQ_FOREACH(td, rqh, td_runq) {
+			count += td->tickets;
+			CTR3(KTR_RUNQ,
+		    	"ltq_choose: i=%d thread=%p rqh=%p", i, td, rqh);
+			if (count > ticket) return (td);
+		}
+	}
+	CTR1(KTR_RUNQ, "ltq_choose: idlethread pri=%d", pri);
 
-// 	return (NULL);
-// }
+	return (NULL);
+}
+
 /*
  * Find the highest priority process on the run queue.
  */
