@@ -1336,7 +1336,7 @@ tdq_choose(struct tdq *tdq)
 	struct thread *td;
 
 	TDQ_LOCK_ASSERT(tdq, MA_OWNED);
-	
+	 
 	// Checking Standard Interactive.
 	td = runq_choose(&tdq->tdq_realtime);
 	if (td != NULL)
