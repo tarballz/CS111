@@ -1336,6 +1336,7 @@ tdq_choose(struct tdq *tdq)
 	struct thread *td;
 
 	TDQ_LOCK_ASSERT(tdq, MA_OWNED);
+	
 	// Checking Standard Interactive.
 	td = runq_choose(&tdq->tdq_realtime);
 	if (td != NULL)
@@ -1349,11 +1350,11 @@ tdq_choose(struct tdq *tdq)
 		return (td);
 	}
 	// Checking Lottery Interactive.
-	td = runq_choose(&tdq->ltq_interactive);
+	td = ltq_choose(&tdq->ltq_interactive);
 	if (td != NULL)
 		return (td);
 	// Checking Lottery Timeshare.
-	td = runq_choose_from(&tdq->ltq_timeshare, tdq->tdq_ridx);
+	td = ltq_choose(&tdq->ltq_timeshare);
 	if (td != NULL) {
 		KASSERT(td->td_priority >= PRI_MIN_BATCH,
 		    ("tdq_choose: Invalid priority on LOTTERY timeshare queue %d",
@@ -1369,7 +1370,7 @@ tdq_choose(struct tdq *tdq)
 		return (td);
 	}
 	// Checking Lottery Idle.
-	td = runq_choose(&tdq->ltq_idle);
+	td = ltq_choose(&tdq->ltq_idle);
 	if (td != NULL) {
 		KASSERT(td->td_priority >= PRI_MIN_IDLE,
 		    ("tdq_choose: Invalid priority on LOTTERY idle queue %d",
