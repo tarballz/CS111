@@ -262,7 +262,6 @@ static int
 donice(struct thread *td, struct proc *p, int n)
 {
 	int error;
-
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 	if ((error = p_cansched(td, p)))
 		return (error);

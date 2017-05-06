@@ -833,8 +833,6 @@ sched_class(struct thread *td, int class)
 static void
 sched_priority(struct thread *td, u_char prio)
 {
-
-
 	KTR_POINT3(KTR_SCHED, "thread", sched_tdname(td), "priority change",
 	    "prio:%d", td->td_priority, "new prio:%d", prio, KTR_ATTR_LINKED,
 	    sched_tdname(curthread));

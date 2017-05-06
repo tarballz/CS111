@@ -360,7 +360,9 @@ void
 runq_add_pri(struct runq *rq, struct thread *td, u_char pri, int flags)
 {
 	struct rqhead *rqh;
-
+	if (td->td_ucred->cr_uid != 0)
+		rq->ticket_range += td->tickets;
+	
 	KASSERT(pri < RQ_NQS, ("runq_add_pri: %d out of range", pri));
 	td->td_rqindex = pri;
 	runq_setbit(rq, pri);
@@ -438,25 +440,29 @@ runq_choose_fuzz(struct runq *rq, int fuzz)
 	return (NULL);
 }
 
-// struct thread *
-// ltq_choose(struct runq *rq)
-// {
-// 	struct rqhead *rqh;
-// 	struct thread *td;
-// 	int pri;
+struct thread *
+ltq_choose(struct runq *rq)
+{
+	struct rqhead *rqh;
+	struct thread *td;
+	uint64_t count = 0;
+	// uint64_t ticket = random() % rq->ticket_range;
+	// uint64_t ticket = ((uint64_t) random() << 32 | random()) % rq->ticket_range;
+	uint64_t ticket = (uint64_t) random() << 32 | (uint64_t) random();
+	if (rq->ticket_range != 0)
+		ticket = ticket % rq->ticket_range;
 
-// 	while ((pri = runq_findbit(rq)) != -1) {
-// 		rqh = &rq->rq_queues[pri];
-// 		td = TAILQ_FIRST(rqh);
-// 		KASSERT(td != NULL, ("ltq_choose: no thread on busy queue"));
-// 		CTR3(KTR_RUNQ,
-// 		    "ltq_choose: pri=%d thread=%p rqh=%p", pri, td, rqh);
-// 		return (td);
-// 	}
-// 	CTR1(KTR_RUNQ, "ltq_choose: idlethread pri=%d", pri);
+	int i;
+	while ((i = runq_findbit(rq)) != -1) {
+		rqh = &rq->rq_queues[i];
+		TAILQ_FOREACH(td, rqh, td_runq) {
+			count += td->tickets;
+			if (count > ticket) return (td);
+		}
+	}
+	return (NULL);
+}
 
-// 	return (NULL);
-// }
 /*
  * Find the highest priority process on the run queue.
  */
@@ -525,6 +531,9 @@ runq_remove_idx(struct runq *rq, struct thread *td, u_char *idx)
 	rqh = &rq->rq_queues[pri];
 	CTR4(KTR_RUNQ, "runq_remove_idx: td=%p, pri=%d %d rqh=%p",
 	    td, td->td_priority, pri, rqh);
+
+	rq->ticket_range -= td->tickets;
+	rq->ticket_range = max(0, rq->ticket_range);
 	TAILQ_REMOVE(rqh, td, td_runq);
 	if (TAILQ_EMPTY(rqh)) {
 		CTR0(KTR_RUNQ, "runq_remove_idx: empty");

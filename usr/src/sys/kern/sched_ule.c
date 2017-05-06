@@ -302,6 +302,8 @@ static struct tdq	tdq_cpu;
 #define	TDQ_UNLOCK(t)		mtx_unlock_spin(TDQ_LOCKPTR((t)))
 #define	TDQ_LOCKPTR(t)		((struct mtx *)(&(t)->tdq_lock))
 
+void adjust_tickets(struct thread *, int);
+
 static void sched_priority(struct thread *);
 static void sched_thread_priority(struct thread *, u_char);
 static int sched_interact_score(struct thread *);
@@ -470,8 +472,6 @@ tdq_runq_add(struct tdq *tdq, struct thread *td, int flags)
 	// Thread struct that has extra fields.
 	ts = td->td_sched;
 	TD_SET_RUNQ(td);
-	if (td->td_ucred->cr_uid != 0)
-		td->tickets = 500;
 	if (THREAD_CAN_MIGRATE(td)) {
 		tdq->tdq_transferable++;
 		ts->ts_flags |= TSF_XFERABLE;
@@ -1336,6 +1336,7 @@ tdq_choose(struct tdq *tdq)
 	struct thread *td;
 
 	TDQ_LOCK_ASSERT(tdq, MA_OWNED);
+	 
 	// Checking Standard Interactive.
 	td = runq_choose(&tdq->tdq_realtime);
 	if (td != NULL)
@@ -1349,11 +1350,11 @@ tdq_choose(struct tdq *tdq)
 		return (td);
 	}
 	// Checking Lottery Interactive.
-	td = runq_choose(&tdq->ltq_interactive);
+	td = ltq_choose(&tdq->ltq_interactive);
 	if (td != NULL)
 		return (td);
 	// Checking Lottery Timeshare.
-	td = runq_choose_from(&tdq->ltq_timeshare, tdq->tdq_ridx);
+	td = ltq_choose(&tdq->ltq_timeshare);
 	if (td != NULL) {
 		KASSERT(td->td_priority >= PRI_MIN_BATCH,
 		    ("tdq_choose: Invalid priority on LOTTERY timeshare queue %d",
@@ -1369,7 +1370,7 @@ tdq_choose(struct tdq *tdq)
 		return (td);
 	}
 	// Checking Lottery Idle.
-	td = runq_choose(&tdq->ltq_idle);
+	td = ltq_choose(&tdq->ltq_idle);
 	if (td != NULL) {
 		KASSERT(td->td_priority >= PRI_MIN_IDLE,
 		    ("tdq_choose: Invalid priority on LOTTERY idle queue %d",
@@ -1563,6 +1564,10 @@ sched_priority(struct thread *td)
 		pri = PRI_MIN_INTERACT;
 		pri += ((PRI_MAX_INTERACT - PRI_MIN_INTERACT + 1) /
 		    sched_interact) * score;
+		
+		// td->tickets = min(max(td->tickets+pri, 1), 100000);
+		// printf("score < sched_interact! changed to: %lu\n", td->tickets);
+
 		KASSERT(pri >= PRI_MIN_INTERACT && pri <= PRI_MAX_INTERACT,
 		    ("sched_priority: invalid interactive priority %d score %d",
 		    pri, score));
@@ -1572,6 +1577,10 @@ sched_priority(struct thread *td)
 			pri += min(SCHED_PRI_TICKS(td->td_sched),
 			    SCHED_PRI_RANGE - 1);
 		pri += SCHED_PRI_NICE(td->td_proc->p_nice);
+
+		// td->tickets = min(max(td->tickets+pri, 1), 100000);
+		// printf("score >= sched_interact! changed to: %lu\n", td->tickets);
+		
 		KASSERT(pri >= PRI_MIN_BATCH && pri <= PRI_MAX_BATCH,
 		    ("sched_priority: invalid priority %d: nice %d, " 
 		    "ticks %d ftick %d ltick %d tick pri %d",
@@ -2019,12 +2028,44 @@ sched_switch(struct thread *td, struct thread *newtd, int flags)
 	td->td_oncpu = cpuid;
 }
 
+void 
+adjust_tickets(struct thread *td, int nice) {
+	printf("adjust_tickets()\ntd->ticket:%lu\n", td->tickets);
+	int score;
+	int pri;
+	score = imax(0, sched_interact_score(td) + td->td_proc->p_nice);
+	if (score < sched_interact) {
+		pri = PRI_MIN_INTERACT;
+		pri += ((PRI_MAX_INTERACT - PRI_MIN_INTERACT + 1) /
+		    sched_interact) * score;
+		
+		printf("\t+%d\n", pri);
+		td->tickets = min(max(td->tickets+pri, 1), 100000);
+		printf("score < sched_interact! changed to: %lu\n", td->tickets);
+
+	} else {
+		pri = SCHED_PRI_MIN;
+		if (td->td_sched->ts_ticks)
+			pri += min(SCHED_PRI_TICKS(td->td_sched),
+			    SCHED_PRI_RANGE - 1);
+		pri += SCHED_PRI_NICE(td->td_proc->p_nice);
+		
+		printf("\t+%d\n", pri);
+		td->tickets = min(max(td->tickets+pri, 1), 100000);
+		printf("score >= sched_interact! changed to: %lu\n", td->tickets);
+		
+	}
+	sched_user_prio(td, pri);
+	return;
+}
+
 /*
  * Adjust thread priorities as a result of a nice request.
  */
 void
 sched_nice(struct proc *p, int nice)
 {
+	printf("sched_nice()\n");
 	struct thread *td;
 
 	PROC_LOCK_ASSERT(p, MA_OWNED);
@@ -2032,7 +2073,14 @@ sched_nice(struct proc *p, int nice)
 	p->p_nice = nice;
 	FOREACH_THREAD_IN_PROC(p, td) {
 		thread_lock(td);
-		sched_priority(td);
+		if (td->td_ucred->cr_uid != 0) {
+			printf("user thread...\n");
+			adjust_tickets(td, nice);
+		}
+		else {
+			printf("non-user thread...\n");
+			sched_priority(td);
+		}
 		sched_prio(td, td->td_base_user_pri);
 		thread_unlock(td);
 	}
