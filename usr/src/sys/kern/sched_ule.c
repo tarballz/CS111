@@ -373,12 +373,63 @@ SDT_PROBE_DEFINE2(sched, , , surrender, "struct thread *",
  * Code for gift Syscall
  */
 int sys_gift(struct thread *td, struct gift_args *args) {
-	log(LOG_DEBUG, "Gifting %d tickets from %d to %d\n", args->t, args->pid, td->td_ucred->cr_uid);
-	// Todo: Actual implementation
+	log(LOG_DEBUG, "Gifting %d tickets to pid %d from a %d process.\n", args->t, args->pid, td->td_ucred->cr_uid);
+
+	/* 
+	 * TODO: gift(0,0) which needs to return the total amount of tickets
+	 *       available to give away.  Which should be giver_total_tickets - giver_total_threads
+	 *		 since every thread must have at least 1 ticket.
+	 */
+
+
+
+	// Thread and process doing the giving.
+	struct thread *g_td;
+	struct proc *giver = td->td_proc; 
+
+	// Thread and process to gift to.
+	struct thread *r_td;
+	struct proc *receiver = pfind(args->pid);
+	r_td = FIRST_THREAD_IN_PROC(receiver);
+
+	if (td->td_ucred->cr_uid == 0 || r_td->td_ucred->cr_uid == 0) {
+		return -1;
+	}
+
+	//int giver_threads = 0;
+	uint64_t giver_tickets_total = 0;
+	uint64_t tickets_to_give = args->t;
+	// Taking tickets away from the "giver" process.
+	FOREACH_THREAD_IN_PROC(giver, g_td) {
+		thread_lock(g_td);
+		//giver_threads += 1;
+		giver_tickets_total += g_td->tickets;
+		if (tickets_to_give > 0 && g_td->tickets > 1) {
+			tickets_to_give -= (g_td->tickets - 1);
+			g_td->tickets = 1;
+		}
+		thread_unlock(g_td);
+	}
+	if (tickets_to_give > giver_tickets_total) {
+		perror("Insufficient tickets.").
+		return -1;
+	}
+	// Giving tickets to the "receiver" process.
+	int receiver_threads = 0;
+	FOREACH_THREAD_IN_PROC(receiver, r_td) {
+		thread_lock(r_td);
+		receiver_threads++;
+		thread_unlock(r_td);
+	}
+	// TODO: Actually dole out the tickets.
+
+
+	printf("Tickets to give: %lu\n", tickets);
+	printf("Calling thread:\nPID: %d\nTickets: %lu\n", giver->p_pid, td->tickets);
+	printf("\nReceiver Process:\nTickets: %lu\n", giver_tickets_total);
+
 	return 13;
 }
-
-
 
 
 /*
