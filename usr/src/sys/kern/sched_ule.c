@@ -376,11 +376,164 @@ SDT_PROBE_DEFINE2(sched, , , surrender, "struct thread *",
  * Code for gift Syscall
  */
 int sys_gift(struct thread *td, struct gift_args *args) {
-    pid_t args_pid = (pid_t)args->pid;
+
+	/* * * * * * * * * * * * * * * * * * * * * * * *
+	 *                Will's Alg                   *
+	 * * * * * * * * * * * * * * * * * * * * * * * */
+
+ //    pid_t args_pid = (pid_t)args->pid;
+	// uint64_t tickets_to_give = (uint64_t)args->t;
+ //    // Thread and process doing the giving.
+	// struct thread *g_td;
+	// struct proc *giver = td->td_proc; 
+
+	// if (giver == NULL) {
+	// 	log(LOG_DEBUG, "Giver process failed to be found.\n");
+	// 	// ESRCH = "no such process"
+	// 	td->td_retval[0] = ESRCH;
+	// 	return ESRCH;
+	// }
+	// PROC_LOCK(giver);
+
+	// /* 
+	//  * Verifying that the process is a "live" process, and that the 
+	//  * process can be "seen" from the thread.
+	//  */
+	// if (giver->p_state != PRS_NORMAL || p_cansee(td, giver) != 0) {
+	// 	PROC_UNLOCK(giver);
+	// 	td->td_retval[0] = ESRCH;
+	// 	return ESRCH;
+	// }
+
+	// uint64_t giver_tickets_total = 0;
+	// int giver_threads = 0;
+
+	// // Count how many tickets the giver can give (to make sure its enough)
+	// FOREACH_THREAD_IN_PROC(giver, g_td) {
+	// 	thread_lock(g_td);
+	// 	if (g_td->tickets > MIN_TICKETS) {
+	// 		giver_tickets_total += g_td->tickets - MIN_TICKETS;
+	// 		giver_threads++;	
+	// 	}
+	// 	thread_unlock(g_td);
+	// }
+
+	// // gift(0, 0)
+	// // This is how you return a value from a systemcall
+	// // The actual return value is the error code
+	// if(args_pid == 0 && tickets_to_give == 0) {
+	// 	PROC_UNLOCK(giver);
+ //    	td->td_retval[0] = giver_tickets_total;
+ //    	return 0;
+	// }
+
+	// if (tickets_to_give > giver_tickets_total) {
+	//   PROC_UNLOCK(giver);
+	//   // EINVAL = "invalid argument"
+	//   td->td_retval[0] = EINVAL;
+	//   return EINVAL; // Not entirly sure which error codes we should be returning
+	// }
+
+	// // Thread and process to gift to.
+	// struct thread *r_td;
+	// struct proc *receiver = pfind(args_pid);
+
+	// if (receiver == NULL) {
+	// 	PROC_UNLOCK(giver);
+	// 	log(LOG_DEBUG, "Receiver process failed to be found.\n");
+	// 	td->td_retval[0] = ESRCH;
+	// 	return ESRCH;
+	// }
+
+	// r_td = FIRST_THREAD_IN_PROC(receiver);
+
+	// if (td->td_ucred->cr_uid == 0 || r_td->td_ucred->cr_uid == 0) {
+	// 	PROC_UNLOCK(giver);
+	// 	PROC_UNLOCK(receiver);
+	// 	// EPERM = "operation not permitted."
+	// 	td->td_retval[0] = EPERM;
+	// 	return EPERM;
+	// }
+
+
+	// // Giving tickets to the "receiver" process.
+	// int receiver_threads = 0;
+	// FOREACH_THREAD_IN_PROC(receiver, r_td) {
+	// 	thread_lock(r_td);
+	// 	if (r_td->tickets < MAX_TICKETS) {
+	// 		receiver_threads++;
+	// 	}
+	// 	thread_unlock(r_td);
+	// }
+
+	// /*
+	//  * Give tickets to the reciver
+	//  * Try to give an equal amount of tickets to each of the reciving processes threads
+	//  * If their are left over tickets (Eg tickets/ threads is not even) give them out
+	//  * sequentially one at a time. So fi there are 5 tickets and 3 threads the first
+	//  * two threads gets2 tickets and the last gets 1.
+	// */
+	// int tickets_to_distrib = tickets_to_give;
+	// int tickets_per_thread = tickets_to_distrib / receiver_threads;
+	// int extra_tickets = tickets_to_distrib % receiver_threads;
+	// //int tmp;
+	// //int t_leftover;
+	// FOREACH_THREAD_IN_PROC(receiver, r_td) {
+	// 	thread_lock(r_td);
+	// 	if ((r_td->tickets + tickets_per_thread) <= MAX_TICKETS) {
+	// 		r_td->tickets += tickets_per_thread;
+	// 		if (extra_tickets > 0) {
+	// 		  r_td->tickets++;
+	// 		  extra_tickets--;
+	// 		}
+	// 		tickets_to_distrib -= tickets_per_thread;
+	// 	// If the tickets we need to give this thread pushes it past 100,000
+	// 	}/* else {
+	// 		tmp = MAX_TICKETS - r_td->tickets;
+	// 		// Give the thread as many tickets to bring it to capacity.
+	// 		r_td->tickets += tmp;
+	// 		t_leftover = tickets_per_thread - tmp;
+	// 		tickets_to_distrib = tickets_to_distrib - tickets_per_thread + t_leftover;
+	// 		// Remove this thread as a "viable" thread.
+	// 		receiver_threads--;
+	// 		tickets_per_thread = tickets_to_distrib / receiver_threads;
+	// 	}*/
+	// 	thread_unlock(r_td);
+	// }
+
+	// // Remove Tickets from the giver
+	// // Communist distribuition policy. The giving process pools all its tickets
+	// // then subtracts the amount it gives away. Finally it gives all its threads
+	// // an approximatly equal number of tickets from the remaining pool
+	// uint64_t leftover_tickets = giver_threads + giver_tickets_total - tickets_to_give;
+	// tickets_per_thread = leftover_tickets / giver_threads;
+	// extra_tickets = leftover_tickets % giver_threads;
+	// FOREACH_THREAD_IN_PROC(giver, g_td) {
+	//      thread_lock(g_td);
+	//      g_td->tickets = tickets_per_thread;
+	//      if (extra_tickets > 0) {
+	//        g_td->tickets++;
+	//        extra_tickets--;
+	//      }
+	//      thread_unlock(g_td);
+	// }
+	
+	// PROC_UNLOCK(giver);
+	// PROC_UNLOCK(receiver);
+
+	// td->td_retval[0] = 0;
+	// return 0;
+
+	/* * * * * * * * * * * * * * * * * * * * * * * *
+	 *                Payton's Alg                 *
+	 * * * * * * * * * * * * * * * * * * * * * * * */
+
+	pid_t args_pid = (pid_t)args->pid;
 	uint64_t tickets_to_give = (uint64_t)args->t;
-    // Thread and process doing the giving.
+	log(LOG_DEBUG, "START: Gifting %lu tickets to pid %d.\n", tickets_to_give, args_pid);
+
 	struct thread *g_td;
-	struct proc *giver = td->td_proc; 
+	struct proc *giver = td->td_proc;
 
 	if (giver == NULL) {
 		log(LOG_DEBUG, "Giver process failed to be found.\n");
@@ -395,6 +548,7 @@ int sys_gift(struct thread *td, struct gift_args *args) {
 	 * process can be "seen" from the thread.
 	 */
 	if (giver->p_state != PRS_NORMAL || p_cansee(td, giver) != 0) {
+		PROC_UNLOCK(giver);
 		td->td_retval[0] = ESRCH;
 		return ESRCH;
 	}
@@ -410,6 +564,7 @@ int sys_gift(struct thread *td, struct gift_args *args) {
 			giver_threads++;	
 		}
 		thread_unlock(g_td);
+		log(LOG_DEBUG, "BEFORE: %d (giver), Thread %d: %lu tickets\n", giver->p_pid, giver_threads, g_td->tickets);
 	}
 
 	// gift(0, 0)
@@ -421,8 +576,11 @@ int sys_gift(struct thread *td, struct gift_args *args) {
     	return 0;
 	}
 
+	log(LOG_DEBUG, "BEFORE: %d (giver), tickets requested: %lu, has avail: %lu\n", giver->p_pid, tickets_to_give, giver_tickets_total);
+
 	if (tickets_to_give > giver_tickets_total) {
 	  PROC_UNLOCK(giver);
+	  log(LOG_DEBUG, "Insufficient tickets.\n");
 	  // EINVAL = "invalid argument"
 	  td->td_retval[0] = EINVAL;
 	  return EINVAL; // Not entirly sure which error codes we should be returning
@@ -449,7 +607,6 @@ int sys_gift(struct thread *td, struct gift_args *args) {
 		return EPERM;
 	}
 
-
 	// Giving tickets to the "receiver" process.
 	int receiver_threads = 0;
 	FOREACH_THREAD_IN_PROC(receiver, r_td) {
@@ -463,60 +620,106 @@ int sys_gift(struct thread *td, struct gift_args *args) {
 	/*
 	 * Give tickets to the reciver
 	 * Try to give an equal amount of tickets to each of the reciving processes threads
-	 * If their are left over tickets (Eg tickes/ threads is not even) give them out
+	 * If their are left over tickets (Eg tickets/ threads is not even) give them out
 	 * sequentially one at a time. So fi there are 5 tickets and 3 threads the first
 	 * two threads gets2 tickets and the last gets 1.
 	*/
 	int tickets_to_distrib = tickets_to_give;
 	int tickets_per_thread = tickets_to_distrib / receiver_threads;
 	int extra_tickets = tickets_to_distrib % receiver_threads;
-	//int tmp;
-	//int t_leftover;
-	FOREACH_THREAD_IN_PROC(receiver, r_td) {
-		thread_lock(r_td);
-		if ((r_td->tickets + tickets_per_thread) <= MAX_TICKETS) {
-			r_td->tickets += tickets_per_thread;
-			if (extra_tickets > 0) {
-			  r_td->tickets++;
-			  extra_tickets--;
+
+	log(LOG_DEBUG, "Each receiver thread should get %d tickets.\n", tickets_per_thread);
+
+	/*
+	 * We now need a while-loop to account for threads that are at capacity (100,000),
+	 * which will therefore mess with the distribution of tickets_per_thread.
+	*/
+	while (tickets_to_distrib > 0) {
+		FOREACH_THREAD_IN_PROC(receiver, r_td) {
+			thread_lock(r_td);
+			log(LOG_DEBUG, "Receiver thread had %lu tickets.\n", r_td->tickets);
+			if ((r_td->tickets + tickets_per_thread) <= MAX_TICKETS) {
+				r_td->tickets += tickets_per_thread;
+				tickets_to_distrib -= tickets_per_thread;
+				// If the thread can't receive the normal amount, can it give half?
+			} else if ((r_td->tickets - tickets_per_thread / 2) <= MAX_TICKETS) {
+				r_td->tickets += tickets_per_thread / 2;
+				tickets_to_distrib += tickets_per_thread / 2;
+				// Accounting for if tickets_per_threads / 2 is not a clean divide.
+				extra_tickets += (tickets_per_thread / 2) % 2;
 			}
-			tickets_to_distrib -= tickets_per_thread;
-		// If the tickets we need to give this thread pushes it past 100,000
-		}/* else {
-			tmp = MAX_TICKETS - r_td->tickets;
-			// Give the thread as many tickets to bring it to capacity.
-			r_td->tickets += tmp;
-			t_leftover = tickets_per_thread - tmp;
-			tickets_to_distrib = tickets_to_distrib - tickets_per_thread + t_leftover;
-			// Remove this thread as a "viable" thread.
-			receiver_threads--;
-			tickets_per_thread = tickets_to_distrib / receiver_threads;
-		}*/
-		thread_unlock(r_td);
+			log(LOG_DEBUG, "Receiver thread now has %lu tickets.\n", r_td->tickets);
+			/*
+			 * If a thread has 100,000 tickets, it is no longer a valid thread.
+			 * This should lead to less traversals of the queue since the value
+			 * of tickets_per_thread will be higher.
+			*/
+			//thread_unlock(r_td);
+			if (r_td->tickets == MAX_TICKETS) {
+				receiver_threads--;
+			}
+			log(LOG_DEBUG, "Tickets left to distrib: %d, extra_tickets: %d\n", tickets_to_distrib, extra_tickets);
+			thread_unlock(r_td);
+		}
+		tickets_to_distrib += extra_tickets;
+		extra_tickets = 0;
+		tickets_per_thread = tickets_to_distrib / receiver_threads;
+		log(LOG_DEBUG, "New tickets_per_thread: %d\n", tickets_per_thread);
 	}
 
 	// Remove Tickets from the giver
-	// Communist distribuition policy. The giving process pools all its tickets
-	// then subtracts the amount it gives away. Finally it gives all its threads
-	// an approximatly equal number of tickets from the remaining pool
-	uint64_t leftover_tickets = giver_threads + giver_tickets_total - tickets_to_give;
-	tickets_per_thread = leftover_tickets / giver_threads;
-	extra_tickets = leftover_tickets % giver_threads;
-	FOREACH_THREAD_IN_PROC(giver, g_td) {
-	     thread_lock(g_td);
-	     g_td->tickets = tickets_per_thread;
-	     if (extra_tickets > 0) {
-	       g_td->tickets++;
-	       extra_tickets--;
-	     }
-	     thread_unlock(g_td);
+	tickets_per_thread = tickets_to_give / giver_threads;
+	log(LOG_DEBUG, "BEFORE: Each giver thread should give %d tickets.\n", tickets_per_thread);
+
+	/*
+	 * extra_tickets will also contain the  "debt" from if a thread can only give half as
+	 * many tickets as the others.
+	*/
+	extra_tickets = tickets_to_give % giver_threads;
+	if (extra_tickets > 0) {
+		log(LOG_DEBUG, "BEFORE: giver extra_tickets = %d\n", extra_tickets);
 	}
-	
+	while (tickets_to_give > 0) {
+		FOREACH_THREAD_IN_PROC(giver, g_td) {
+			thread_lock(g_td);
+			if ((g_td->tickets - tickets_per_thread) >= MIN_TICKETS) {
+				g_td->tickets -= tickets_per_thread;
+				tickets_to_give -= tickets_per_thread;
+			// If the thread can't give the normal amount, can it give half?
+			} else if ((g_td->tickets - tickets_per_thread / 2) >= MIN_TICKETS) {
+				g_td->tickets -= tickets_per_thread / 2;
+				tickets_to_give -= tickets_per_thread / 2;
+				// Accounting for if tickets_per_threads/2 is not a clean divide.
+				extra_tickets += (tickets_per_thread / 2) % 2;
+			}
+			/*
+			 * If a thread has only 1 ticket, it is no longer a valid thread.
+			 * This should lead to less traversals of the queue since the value
+			 * of tickets_per_thread will be higher.
+			*/
+			if (g_td->tickets == MIN_TICKETS) {
+				giver_threads--;
+			}
+			thread_unlock(g_td);
+			log(LOG_DEBUG, "Tickets left to give: %lu, extra_tickets: %d\n", tickets_to_give, extra_tickets);
+			log(LOG_DEBUG, "AFTER: Giver now has %lu tickets.", g_td->tickets);
+		}
+		/*
+		 * Reassigning tickets_per_thread based on new value of tickets_to_give
+		 * to account for an additional pass-through.
+		 */
+		tickets_to_give += extra_tickets;
+		extra_tickets = 0;
+		tickets_per_thread = tickets_to_give / giver_threads;
+		log(LOG_DEBUG, "New tickets_per_thread: %d\n", tickets_per_thread);
+	}
+
 	PROC_UNLOCK(giver);
 	PROC_UNLOCK(receiver);
 
 	td->td_retval[0] = 0;
 	return 0;
+
 }
 
 
