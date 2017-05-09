@@ -376,6 +376,8 @@ SDT_PROBE_DEFINE2(sched, , , surrender, "struct thread *",
  * Code for gift Syscall
  */
 int sys_gift(struct thread *td, struct gift_args *args) {
+    pid_t args_pid = (pid_t)args->pid;
+	uint64_t tickets_to_give = (uint64_t)args->t;
     // Thread and process doing the giving.
 	struct thread *g_td;
 	struct proc *giver = td->td_proc; 
@@ -397,9 +399,7 @@ int sys_gift(struct thread *td, struct gift_args *args) {
 		return ESRCH;
 	}
 
-	//int giver_threads = 0;
 	uint64_t giver_tickets_total = 0;
-	uint64_t tickets_to_give = args->t;
 	int giver_threads = 0;
 
 	// Count how many tickets the giver can give (to make sure its enough)
@@ -415,13 +415,14 @@ int sys_gift(struct thread *td, struct gift_args *args) {
 	// gift(0, 0)
 	// This is how you return a value from a systemcall
 	// The actual return value is the error code
-	if(args->pid == 0 && args->t == 0) {
+	if(args_pid == 0 && tickets_to_give == 0) {
 		PROC_UNLOCK(giver);
     	td->td_retval[0] = giver_tickets_total;
     	return 0;
 	}
 
 	if (tickets_to_give > giver_tickets_total) {
+	  PROC_UNLOCK(giver);
 	  // EINVAL = "invalid argument"
 	  td->td_retval[0] = EINVAL;
 	  return EINVAL; // Not entirly sure which error codes we should be returning
@@ -429,9 +430,10 @@ int sys_gift(struct thread *td, struct gift_args *args) {
 
 	// Thread and process to gift to.
 	struct thread *r_td;
-	struct proc *receiver = pfind(args->pid);
+	struct proc *receiver = pfind(args_pid);
 
 	if (receiver == NULL) {
+		PROC_UNLOCK(giver);
 		log(LOG_DEBUG, "Receiver process failed to be found.\n");
 		td->td_retval[0] = ESRCH;
 		return ESRCH;
@@ -440,6 +442,8 @@ int sys_gift(struct thread *td, struct gift_args *args) {
 	r_td = FIRST_THREAD_IN_PROC(receiver);
 
 	if (td->td_ucred->cr_uid == 0 || r_td->td_ucred->cr_uid == 0) {
+		PROC_UNLOCK(giver);
+		PROC_UNLOCK(receiver);
 		// EPERM = "operation not permitted."
 		td->td_retval[0] = EPERM;
 		return EPERM;

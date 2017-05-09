@@ -11,7 +11,7 @@ int main(int argc, char *argv[]) {
   if (forkRes == 0) {
     // Child
     printf("i errno %d\n", errno);
-    res = syscall(548, getppid(), 2);
+    res = syscall(548, 759, 10);
     printf("c res %d\n", res);
     printf("c errno %d\n", errno);
   } else {
