@@ -6,12 +6,15 @@
 #include <sys/wait.h>
 
 int main(int argc, char *argv[]) {
+  if (argc != 3) {
+    exit(-1);
+  }
   int forkRes = fork();
   int res;
   if (forkRes == 0) {
     // Child
     printf("i errno %d\n", errno);
-    res = syscall(548, getppid(), 2);
+    res = syscall(548, argv[1], argv[2]);
     printf("c res %d\n", res);
     printf("c errno %d\n", errno);
   } else {

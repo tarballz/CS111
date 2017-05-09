@@ -81,6 +81,9 @@ dtrace_vtime_switch_func_t	dtrace_vtime_switch_func;
 
 #define	KTR_ULE	0
 
+#define MIN_TICKETS 1
+#define MAX_TICKETS 100000
+
 #define	TS_NAME_LEN (MAXCOMLEN + sizeof(" td ") + sizeof(__XSTRING(UINT_MAX)))
 #define	TDQ_NAME_LEN	(sizeof("sched lock ") + sizeof(__XSTRING(MAXCPU)))
 #define	TDQ_LOADNAME_LEN	(sizeof("CPU ") + sizeof(__XSTRING(MAXCPU)) - 1 + sizeof(" load"))
@@ -376,8 +379,23 @@ int sys_gift(struct thread *td, struct gift_args *args) {
     // Thread and process doing the giving.
 	struct thread *g_td;
 	struct proc *giver = td->td_proc; 
+
+	if (giver == NULL) {
+		log(LOG_DEBUG, "Giver process failed to be found.\n");
+		// ESRCH = "no such process"
+		td->td_retval[0] = ESRCH;
+		return ESRCH;
+	}
 	PROC_LOCK(giver);
 
+	/* 
+	 * Verifying that the process is a "live" process, and that the 
+	 * process can be "seen" from the thread.
+	 */
+	if (giver->p_state != PRS_NORMAL || p_cansee(td, giver) != 0) {
+		td->td_retval[0] = ESRCH;
+		return ESRCH;
+	}
 
 	//int giver_threads = 0;
 	uint64_t giver_tickets_total = 0;
@@ -387,8 +405,10 @@ int sys_gift(struct thread *td, struct gift_args *args) {
 	// Count how many tickets the giver can give (to make sure its enough)
 	FOREACH_THREAD_IN_PROC(giver, g_td) {
 		thread_lock(g_td);
-		giver_tickets_total += g_td->tickets - 1;
-		giver_threads++;
+		if (g_td->tickets > MIN_TICKETS) {
+			giver_tickets_total += g_td->tickets - MIN_TICKETS;
+			giver_threads++;	
+		}
 		thread_unlock(g_td);
 	}
 
@@ -402,19 +422,27 @@ int sys_gift(struct thread *td, struct gift_args *args) {
 	}
 
 	if (tickets_to_give > giver_tickets_total) {
-	  td->td_retval[0] = 1;
-	  return 1; // Not entirly sure which error codes we should be returning
+	  // EINVAL = "invalid argument"
+	  td->td_retval[0] = EINVAL;
+	  return EINVAL; // Not entirly sure which error codes we should be returning
 	}
 
 	// Thread and process to gift to.
 	struct thread *r_td;
 	struct proc *receiver = pfind(args->pid);
 
+	if (receiver == NULL) {
+		log(LOG_DEBUG, "Receiver process failed to be found.\n");
+		td->td_retval[0] = ESRCH;
+		return ESRCH;
+	}
+
 	r_td = FIRST_THREAD_IN_PROC(receiver);
 
 	if (td->td_ucred->cr_uid == 0 || r_td->td_ucred->cr_uid == 0) {
-		td->td_retval[0] = 3;
-		return 3;
+		// EPERM = "operation not permitted."
+		td->td_retval[0] = EPERM;
+		return EPERM;
 	}
 
 
@@ -422,24 +450,44 @@ int sys_gift(struct thread *td, struct gift_args *args) {
 	int receiver_threads = 0;
 	FOREACH_THREAD_IN_PROC(receiver, r_td) {
 		thread_lock(r_td);
-		receiver_threads++;
+		if (r_td->tickets < MAX_TICKETS) {
+			receiver_threads++;
+		}
 		thread_unlock(r_td);
 	}
 
-	// Give tickets to the reciver
-	// Try to give an equal amount of tickets to each of the reciving processes threads
-	// If their are left over tickets (Eg tickes/ threads is not even) give them out
-	// sequentially one at a time. So fi there are 5 tickets and 3 threads the first
-	// two threads gets2 tickets and the last gets 1.
-	int tickets_per_thread = tickets_to_give / receiver_threads;
-	int extra_tickets = tickets_to_give % receiver_threads;
+	/*
+	 * Give tickets to the reciver
+	 * Try to give an equal amount of tickets to each of the reciving processes threads
+	 * If their are left over tickets (Eg tickes/ threads is not even) give them out
+	 * sequentially one at a time. So fi there are 5 tickets and 3 threads the first
+	 * two threads gets2 tickets and the last gets 1.
+	*/
+	int tickets_to_distrib = tickets_to_give;
+	int tickets_per_thread = tickets_to_distrib / receiver_threads;
+	int extra_tickets = tickets_to_distrib % receiver_threads;
+	//int tmp;
+	//int t_leftover;
 	FOREACH_THREAD_IN_PROC(receiver, r_td) {
 		thread_lock(r_td);
-		r_td->tickets += tickets_per_thread;
-		if (extra_tickets > 0) {
-		  r_td->tickets++;
-		  extra_tickets--;
-		}
+		if ((r_td->tickets + tickets_per_thread) <= MAX_TICKETS) {
+			r_td->tickets += tickets_per_thread;
+			if (extra_tickets > 0) {
+			  r_td->tickets++;
+			  extra_tickets--;
+			}
+			tickets_to_distrib -= tickets_per_thread;
+		// If the tickets we need to give this thread pushes it past 100,000
+		}/* else {
+			tmp = MAX_TICKETS - r_td->tickets;
+			// Give the thread as many tickets to bring it to capacity.
+			r_td->tickets += tmp;
+			t_leftover = tickets_per_thread - tmp;
+			tickets_to_distrib = tickets_to_distrib - tickets_per_thread + t_leftover;
+			// Remove this thread as a "viable" thread.
+			receiver_threads--;
+			tickets_per_thread = tickets_to_distrib / receiver_threads;
+		}*/
 		thread_unlock(r_td);
 	}
 
@@ -462,6 +510,7 @@ int sys_gift(struct thread *td, struct gift_args *args) {
 	
 	PROC_UNLOCK(giver);
 	PROC_UNLOCK(receiver);
+
 	td->td_retval[0] = 0;
 	return 0;
 }
