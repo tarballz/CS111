@@ -488,7 +488,7 @@ int sys_gift(struct thread *td, struct gift_args *args) {
 	// 		}
 	// 		tickets_to_distrib -= tickets_per_thread;
 	// 	// If the tickets we need to give this thread pushes it past 100,000
-	// 	}/* else {
+	// 	} else {
 	// 		tmp = MAX_TICKETS - r_td->tickets;
 	// 		// Give the thread as many tickets to bring it to capacity.
 	// 		r_td->tickets += tmp;
@@ -497,7 +497,7 @@ int sys_gift(struct thread *td, struct gift_args *args) {
 	// 		// Remove this thread as a "viable" thread.
 	// 		receiver_threads--;
 	// 		tickets_per_thread = tickets_to_distrib / receiver_threads;
-	// 	}*/
+	// 	}
 	// 	thread_unlock(r_td);
 	// }
 
@@ -634,7 +634,7 @@ int sys_gift(struct thread *td, struct gift_args *args) {
 	 * We now need a while-loop to account for threads that are at capacity (100,000),
 	 * which will therefore mess with the distribution of tickets_per_thread.
 	*/
-	while (tickets_to_distrib > 0) {
+	while (tickets_to_distrib > 0 && receiver_threads > 0) {
 		FOREACH_THREAD_IN_PROC(receiver, r_td) {
 			thread_lock(r_td);
 			log(LOG_DEBUG, "Receiver thread had %lu tickets.\n", r_td->tickets);
@@ -679,7 +679,7 @@ int sys_gift(struct thread *td, struct gift_args *args) {
 	if (extra_tickets > 0) {
 		log(LOG_DEBUG, "BEFORE: giver extra_tickets = %d\n", extra_tickets);
 	}
-	while (tickets_to_give > 0) {
+	while (tickets_to_give > 0 && giver_threads > 0) {
 		FOREACH_THREAD_IN_PROC(giver, g_td) {
 			thread_lock(g_td);
 			if ((g_td->tickets - tickets_per_thread) >= MIN_TICKETS) {
