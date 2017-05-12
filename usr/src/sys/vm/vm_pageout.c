@@ -112,6 +112,8 @@ __FBSDID("$FreeBSD: releng/10.3/sys/vm/vm_pageout.c 292104 2015-12-11 13:20:51Z 
 #include <vm/vm_extern.h>
 #include <vm/uma.h>
 
+#include <sys/syslog.h>
+
 /*
  * System initialization
  */
@@ -952,6 +954,17 @@ vm_pageout_scan(struct vm_domain *vmd, int pass)
 	int lockmode;
 	boolean_t queues_locked;
 
+		
+	// Information to be logged
+	int inactive_queue_pages = 0;
+	int queues_scanned = 0;
+	int active_queue_pages = 0;
+	int pages_moved_to_cache = 0;
+	int pages_moved_to_inactive = 0;
+	int pages_queued_for_flush = 0;
+
+
+
 	/*
 	 * If we need to reclaim memory ask kernel caches to return
 	 * some.  We rate limit to avoid thrashing.
@@ -1016,6 +1029,9 @@ vm_pageout_scan(struct vm_domain *vmd, int pass)
 	maxscan = pq->pq_cnt;
 	vm_pagequeue_lock(pq);
 	queues_locked = TRUE;
+
+	inactive_queue_pages = pq->pq_cnt;
+
 	for (m = TAILQ_FIRST(&pq->pq_pl);
 	     m != NULL && maxscan-- > 0 && page_shortage > 0;
 	     m = next) {
@@ -1160,6 +1176,7 @@ vm_pageout_scan(struct vm_domain *vmd, int pass)
 			 */
 			vm_page_cache(m);
 			--page_shortage;
+			pages_moved_to_cache++;
 		} else if ((m->flags & PG_WINATCFLS) == 0 && pass < 2) {
 			/*
 			 * Dirty pages need to be paged out, but flushing
@@ -1173,6 +1190,8 @@ vm_pageout_scan(struct vm_domain *vmd, int pass)
 			 * before being freed.  This significantly extends
 			 * the thrash point for a heavily loaded machine.
 			 */
+			pages_queued_for_flush++;
+
 			m->flags |= PG_WINATCFLS;
 			vm_pagequeue_lock(pq);
 			queues_locked = TRUE;
@@ -1382,6 +1401,8 @@ relock_queues:
 	vm_pagequeue_lock(pq);
 	maxscan = pq->pq_cnt;
 
+	active_queue_pages = pq->pq_cnt;
+
 	/*
 	 * If we're just idle polling attempt to visit every
 	 * active page within 'update_period' seconds.
@@ -1466,11 +1487,16 @@ relock_queues:
 			vm_page_dequeue_locked(m);
 			vm_page_deactivate(m);
 			page_shortage--;
+			pages_moved_to_inactive++;
 		} else
 			vm_page_requeue_locked(m);
 		vm_page_unlock(m);
 	}
 	vm_pagequeue_unlock(pq);
+	log(LOG_DEBUG, "inactive\tactive\tto_inact\tto_cache\tflush\n");
+	log(LOG_DEBUG, "%d\t%d\t%d\t%d\t%d\n", inactive_queue_pages, active_queue_pages, pages_moved_to_inactive, 
+		pages_moved_to_cache, pages_queued_for_flush);
+
 #if !defined(NO_SWAPPING)
 	/*
 	 * Idle process swapout -- run once per second.
