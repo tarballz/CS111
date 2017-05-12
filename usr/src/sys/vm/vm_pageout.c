@@ -1031,6 +1031,7 @@ vm_pageout_scan(struct vm_domain *vmd, int pass)
 	queues_locked = TRUE;
 
 	inactive_queue_pages = pq->pq_cnt;
+	queues_scanned++;
 
 	for (m = TAILQ_FIRST(&pq->pq_pl);
 	     m != NULL && maxscan-- > 0 && page_shortage > 0;
@@ -1400,7 +1401,7 @@ relock_queues:
 	pq = &vmd->vmd_pagequeues[PQ_ACTIVE];
 	vm_pagequeue_lock(pq);
 	maxscan = pq->pq_cnt;
-
+	queues_scanned++;
 	active_queue_pages = pq->pq_cnt;
 
 	/*
@@ -1493,7 +1494,7 @@ relock_queues:
 		vm_page_unlock(m);
 	}
 	vm_pagequeue_unlock(pq);
-	log(LOG_DEBUG, "inactive\tactive\tscanned\tto_inact\tto_cache\tflush\n");
+	log(LOG_DEBUG, "inact\tactive\tscanned\ttoInact\tto_csh\tflush\n");
 	log(LOG_DEBUG, "%d\t%d\t%d\t%d\t%d\t%d\n", inactive_queue_pages, active_queue_pages, queues_scanned, pages_moved_to_inactive, 
 		pages_moved_to_cache, pages_queued_for_flush);
 
