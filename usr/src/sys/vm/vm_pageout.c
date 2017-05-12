@@ -1493,8 +1493,8 @@ relock_queues:
 		vm_page_unlock(m);
 	}
 	vm_pagequeue_unlock(pq);
-	log(LOG_DEBUG, "inactive\tactive\tto_inact\tto_cache\tflush\n");
-	log(LOG_DEBUG, "%d\t%d\t%d\t%d\t%d\n", inactive_queue_pages, active_queue_pages, pages_moved_to_inactive, 
+	log(LOG_DEBUG, "inactive\tactive\tscanned\tto_inact\tto_cache\tflush\n");
+	log(LOG_DEBUG, "%d\t%d\t%d\t%d\t%d\t%d\n", inactive_queue_pages, active_queue_pages, queues_scanned, pages_moved_to_inactive, 
 		pages_moved_to_cache, pages_queued_for_flush);
 
 #if !defined(NO_SWAPPING)
