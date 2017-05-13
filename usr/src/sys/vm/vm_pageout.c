@@ -1185,6 +1185,7 @@ vm_pageout_scan(struct vm_domain *vmd, int pass)
 		 *     continue
 		 * }
 		 */
+		 // NEED TO MOVE PAGE TO REAR OF FREE LIST.
 		if (m->valid == 0) {
 			/*
 			 * Invalid pages can be easily freed
@@ -1516,6 +1517,7 @@ relock_queues:
 		if (act_delta == 0) {
 			/* Dequeue to avoid later lock recursion. */
 			vm_page_dequeue_locked(m);
+			// Moves page to the inactive queue.
 			vm_page_deactivate(m);
 			page_shortage--;
 			pages_moved_to_inactive++;
@@ -1761,7 +1763,7 @@ vm_pageout_oom(int shortage)
 }
 
 static void
-/vm_pageout_worker(void *arg)
+vm_pageout_worker(void *arg)
 {
 	struct vm_domain *domain;
 	int domidx;
