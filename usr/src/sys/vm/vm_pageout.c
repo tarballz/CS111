@@ -1142,7 +1142,8 @@ vm_pageout_scan(struct vm_domain *vmd, int pass)
 			} else {
 				vm_pagequeue_lock(pq);
 				queues_locked = TRUE;
-				vm_page_requeue_locked(m);
+				//vm_page_requeue_locked(m);
+				vm_page_insert_front_self(m);
 			}
 			VM_OBJECT_WUNLOCK(object);
 			vm_page_unlock(m);
@@ -1185,7 +1186,6 @@ vm_pageout_scan(struct vm_domain *vmd, int pass)
 		 *     continue
 		 * }
 		 */
-		 // NEED TO MOVE PAGE TO REAR OF FREE LIST.
 		if (m->valid == 0) {
 			/*
 			 * Invalid pages can be easily freed
