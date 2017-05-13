@@ -1511,7 +1511,7 @@ relock_queues:
 		}
 
 		/*
-		 * Move this page to the tail of the active or inactive
+		 * Move this page to the HEAD of the active or inactive
 		 * queue depending on usage.
 		 */
 		if (act_delta == 0) {
@@ -1521,8 +1521,11 @@ relock_queues:
 			vm_page_deactivate(m);
 			page_shortage--;
 			pages_moved_to_inactive++;
+		// I'm assuming this is for the active queue, since the above
+		// condition send us to deactivate() which is for the inactive queue.
 		} else
-			vm_page_requeue_locked(m);
+			//vm_page_requeue_locked(m);
+			vm_page_insert_front_self(m);
 		vm_page_unlock(m);
 	}
 	vm_pagequeue_unlock(pq);
