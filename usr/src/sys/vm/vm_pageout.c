@@ -1179,13 +1179,6 @@ vm_pageout_scan(struct vm_domain *vmd, int pass)
 				pmap_remove_all(m);
 		}
 
-		/*
-		 * if (page is invalid) {
-		 *     move page to front of free list
-		 *     page_shortage--
-		 *     continue
-		 * }
-		 */
 		if (m->valid == 0) {
 			/*
 			 * Invalid pages can be easily freed
@@ -1193,13 +1186,6 @@ vm_pageout_scan(struct vm_domain *vmd, int pass)
 			vm_page_free(m);
 			PCPU_INC(cnt.v_dfree);
 			--page_shortage;
-		/*
-		 * if (page is clean) {
-		 *     move page to end of cache list
-		 *     page_shortage--
-		 *     continue
-		 * }
-		 */
 		} else if (m->dirty == 0) {
 			/*
 			 * Clean pages can be placed onto the cache queue.
@@ -1523,9 +1509,13 @@ relock_queues:
 			pages_moved_to_inactive++;
 		// I'm assuming this is for the active queue, since the above
 		// condition send us to deactivate() which is for the inactive queue.
-		} else
-			//vm_page_requeue_locked(m);
-			vm_page_insert_front_self(m);
+		} else {
+			if (EXPERIMENTAL_PAGEOUT) {
+				vm_page_insert_front_self(m);
+			} else {
+				vm_page_requeue_locked(m);				
+			}
+		}
 		vm_page_unlock(m);
 	}
 	vm_pagequeue_unlock(pq);

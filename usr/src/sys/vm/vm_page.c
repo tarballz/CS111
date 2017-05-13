@@ -2449,8 +2449,8 @@ _vm_page_deactivate(vm_page_t m, int athead)
 	 * Ignore if the page is already inactive, unless it is unlikely to be
 	 * reactivated.
 	 */
-	//if ((queue = m->queue) == PQ_INACTIVE && !athead)
-	//	return;
+	if ((queue = m->queue) == PQ_INACTIVE && !athead)
+		return;
 	if (m->wire_count == 0 && (m->oflags & VPO_UNMANAGED) == 0) {
 		pq = &vm_phys_domain(m)->vmd_pagequeues[PQ_INACTIVE];
 		/* Avoid multiple acquisitions of the inactive queue lock. */
@@ -2464,12 +2464,17 @@ _vm_page_deactivate(vm_page_t m, int athead)
 			vm_pagequeue_lock(pq);
 		}
 		m->queue = PQ_INACTIVE;
-		/*if (athead)
+		if (EXPERIMENTAL_PAGEOUT) {
 			TAILQ_INSERT_HEAD(&pq->pq_pl, m, plinks.q);
-		else
-			TAILQ_INSERT_TAIL(&pq->pq_pl, m, plinks.q);*/
+		} else {
+			if (athead)
+				TAILQ_INSERT_HEAD(&pq->pq_pl, m, plinks.q);
+			else
+				TAILQ_INSERT_TAIL(&pq->pq_pl, m, plinks.q);
+		}
+		
+
 		// Now everything gets inserted to the front.
-		TAILQ_INSERT_HEAD(&pq->pq_pl, m, plinks.q);
 		vm_pagequeue_cnt_inc(pq);
 		vm_pagequeue_unlock(pq);
 	}
