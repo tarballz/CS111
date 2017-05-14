@@ -1383,6 +1383,10 @@ relock_queues:
 		TAILQ_REMOVE(&pq->pq_pl, &vmd->vmd_marker, plinks.q);
 	}
 	vm_pagequeue_unlock(pq);
+	log(LOG_DEBUG, "INACTIVE PASS:\n");
+	log(LOG_DEBUG, "%-8s %-8s %-8s %-8s %-8s %-8s %-8s\n", "pass", "inact", "active", "scanned", "toInact", "2cache", "flush");
+	log(LOG_DEBUG, "%-8d %-8d %-8d %-8d %-8d %-8d %-8d\n", pass, inactive_queue_pages, active_queue_pages, queues_scanned, pages_moved_to_inactive, 
+		pages_moved_to_cache, pages_queued_for_flush);
 
 #if !defined(NO_SWAPPING)
 	/*
@@ -1491,8 +1495,15 @@ relock_queues:
 			if (m->act_count > ACT_MAX)
 				m->act_count = ACT_MAX;
 		} else {
-			//m->act_count -= min(m->act_count, ACT_DECLINE);
-			m->act_count /= 2;
+			if (EXPERIMENTAL_PAGEOUT) {
+				if (m->act_count > 1) {
+					m->act_count /= 2;
+				} else {
+					m->act_count = 0;
+				}
+			} else {
+				m->act_count -= min(m->act_count, ACT_DECLINE);
+			}
 			act_delta = m->act_count;
 		}
 
@@ -1519,8 +1530,9 @@ relock_queues:
 		vm_page_unlock(m);
 	}
 	vm_pagequeue_unlock(pq);
-	log(LOG_DEBUG, "inact\tactive\tscanned\ttoInact\tto_csh\tflush\n");
-	log(LOG_DEBUG, "%d\t%d\t%d\t%d\t%d\t%d\n", inactive_queue_pages, active_queue_pages, queues_scanned, pages_moved_to_inactive, 
+	log(LOG_DEBUG, "ACTIVE PASS:\n");
+	log(LOG_DEBUG, "%-8s %-8s %-8s %-8s %-8s %-8s %-8s\n", "pass", "inact", "active", "scanned", "toInact", "2cache", "flush");
+	log(LOG_DEBUG, "%-8d %-8d %-8d %-8d %-8d %-8d %-8d\n", pass, inactive_queue_pages, active_queue_pages, queues_scanned, pages_moved_to_inactive, 
 		pages_moved_to_cache, pages_queued_for_flush);
 
 #if !defined(NO_SWAPPING)
