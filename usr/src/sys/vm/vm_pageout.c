@@ -1583,6 +1583,7 @@ vm_pageout_mightbe_oom(struct vm_domain *vmd, int page_shortage,
 
 	if (vmd->vmd_oom)
 		return;
+	
 
 	vmd->vmd_oom = TRUE;
 	old_vote = atomic_fetchadd_int(&vm_pageout_oom_vote, 1);
@@ -1756,6 +1757,9 @@ vm_pageout_oom(int shortage)
 			PRELE(p);
 		}
 	}
+
+	log(LOG_DEBUG, "OUT OF MEMORY.\n");
+	
 	sx_sunlock(&allproc_lock);
 	if (bigproc != NULL) {
 		PROC_LOCK(bigproc);
