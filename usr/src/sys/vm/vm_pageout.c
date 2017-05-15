@@ -1142,8 +1142,14 @@ vm_pageout_scan(struct vm_domain *vmd, int pass)
 			} else {
 				vm_pagequeue_lock(pq);
 				queues_locked = TRUE;
-				//vm_page_requeue_locked(m);
+
+				// asgn3 - "Pages moved to the front of the active list"
+				#if EXPERIMENTAL_PAGEOUT
 				vm_page_insert_front_self(m);
+				#else
+				vm_page_requeue_locked(m);
+				#endif
+				
 			}
 			VM_OBJECT_WUNLOCK(object);
 			vm_page_unlock(m);
@@ -1495,15 +1501,17 @@ relock_queues:
 			if (m->act_count > ACT_MAX)
 				m->act_count = ACT_MAX;
 		} else {
-			if (EXPERIMENTAL_PAGEOUT) {
-				if (m->act_count > 1) {
-					m->act_count /= 2;
-				} else {
-					m->act_count = 0;
-				}
+			// asgn3 - "Activity Count halved instead of default "
+			#if EXPERIMENTAL_PAGEOUT
+			if (m->act_count > 1) {
+				m->act_count /= 2;
 			} else {
-				m->act_count -= min(m->act_count, ACT_DECLINE);
+				m->act_count = 0;
 			}
+			#else
+			m->act_count -= min(m->act_count, ACT_DECLINE);
+			#endif
+
 			act_delta = m->act_count;
 		}
 
@@ -1521,11 +1529,12 @@ relock_queues:
 		// I'm assuming this is for the active queue, since the above
 		// condition send us to deactivate() which is for the inactive queue.
 		} else {
-			if (EXPERIMENTAL_PAGEOUT) {
+			// asgn3 - "Pages moved to the front of the active list "
+			#if EXPERIMENTAL_PAGEOUT
 				vm_page_insert_front_self(m);
-			} else {
+			#else
 				vm_page_requeue_locked(m);				
-			}
+			#endif
 		}
 		vm_page_unlock(m);
 	}
@@ -1756,6 +1765,10 @@ vm_pageout_oom(int shortage)
 			PRELE(p);
 		}
 	}
+
+	// asgn3 - logging
+	log( LOG_DEBUG, "Out of memory");
+
 	sx_sunlock(&allproc_lock);
 	if (bigproc != NULL) {
 		PROC_LOCK(bigproc);
@@ -1881,11 +1894,16 @@ vm_pageout_init(void)
 	 * page at least once every ten minutes.  This is to prevent worst
 	 * case paging behaviors with stale active LRU.
 	 */
-	//if (vm_pageout_update_period == 0)
-	//	vm_pageout_update_period = 600;
 
-	/* Altering the vm_pageout_update_period to be 10 seconds instead of 10 minutes. */
-	vm_pageout_update_period = 10;
+	// asgn3 - "Pageout scan made to run more frequently (10s rather than default)"
+	#if EXPERIMENTAL_PAGEOUT
+	if (vm_pageout_update_period == 0)
+		vm_pageout_update_period = 10;
+	#else
+	if (vm_pageout_update_period == 0)
+		vm_pageout_update_period = 600;
+	#endif
+	
 
 	/* XXX does not really belong here */
 	if (vm_page_max_wired == 0)

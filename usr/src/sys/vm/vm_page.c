@@ -2464,14 +2464,16 @@ _vm_page_deactivate(vm_page_t m, int athead)
 			vm_pagequeue_lock(pq);
 		}
 		m->queue = PQ_INACTIVE;
-		if (EXPERIMENTAL_PAGEOUT) {
+
+		// asgn3 - "Pages moved to the front of the inactive list"
+		#if EXPERIMENTAL_PAGEOUT
 			TAILQ_INSERT_HEAD(&pq->pq_pl, m, plinks.q);
-		} else {
+		#else
 			if (athead)
 				TAILQ_INSERT_HEAD(&pq->pq_pl, m, plinks.q);
 			else
 				TAILQ_INSERT_TAIL(&pq->pq_pl, m, plinks.q);
-		}
+		#endif
 		
 
 		// Now everything gets inserted to the front.
