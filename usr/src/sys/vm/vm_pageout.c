@@ -1001,7 +1001,12 @@ vm_pageout_scan(struct vm_domain *vmd, int pass)
 		page_shortage = vm_paging_target() + deficit;
 	} else
 		page_shortage = deficit = 0;
+	/*
+	 * page_shortage is the number of pages that need to be moved
+	 * from the inactive list to the cache list.
+	 */
 	starting_page_shortage = page_shortage;
+
 
 	/*
 	 * maxlaunder limits the number of dirty pages we flush per scan.
@@ -1033,6 +1038,9 @@ vm_pageout_scan(struct vm_domain *vmd, int pass)
 	inactive_queue_pages = pq->pq_cnt;
 	queues_scanned++;
 
+	/*
+	 * for (page = first(inactive list); page; page = next)
+	 */
 	for (m = TAILQ_FIRST(&pq->pq_pl);
 	     m != NULL && maxscan-- > 0 && page_shortage > 0;
 	     m = next) {
@@ -1041,6 +1049,7 @@ vm_pageout_scan(struct vm_domain *vmd, int pass)
 		KASSERT(m->queue == PQ_INACTIVE, ("Inactive queue %p", m));
 
 		PCPU_INC(cnt.v_pdpages);
+		// next = next(page)
 		next = TAILQ_NEXT(m, plinks.q);
 
 		/*
@@ -1105,6 +1114,12 @@ vm_pageout_scan(struct vm_domain *vmd, int pass)
 		 * references.
 		 */
 		act_delta = 0;
+		/*
+		 * if (page is referenced) {
+		 *     update page active count
+		 *     move page to end of active list
+		 * } 
+		 */
 		if ((m->aflags & PGA_REFERENCED) != 0) {
 			vm_page_aflag_clear(m, PGA_REFERENCED);
 			act_delta = 1;
@@ -1127,7 +1142,8 @@ vm_pageout_scan(struct vm_domain *vmd, int pass)
 			} else {
 				vm_pagequeue_lock(pq);
 				queues_locked = TRUE;
-				vm_page_requeue_locked(m);
+				//vm_page_requeue_locked(m);
+				vm_page_insert_front_self(m);
 			}
 			VM_OBJECT_WUNLOCK(object);
 			vm_page_unlock(m);
@@ -1367,6 +1383,10 @@ relock_queues:
 		TAILQ_REMOVE(&pq->pq_pl, &vmd->vmd_marker, plinks.q);
 	}
 	vm_pagequeue_unlock(pq);
+	log(LOG_DEBUG, "INACTIVE PASS:\n");
+	log(LOG_DEBUG, "%-8s %-8s %-8s %-8s %-8s %-8s %-8s\n", "pass", "inact", "active", "scanned", "toInact", "2cache", "flush");
+	log(LOG_DEBUG, "%-8d %-8d %-8d %-8d %-8d %-8d %-8d\n", pass, inactive_queue_pages, active_queue_pages, queues_scanned, pages_moved_to_inactive, 
+		pages_moved_to_cache, pages_queued_for_flush);
 
 #if !defined(NO_SWAPPING)
 	/*
@@ -1475,27 +1495,44 @@ relock_queues:
 			if (m->act_count > ACT_MAX)
 				m->act_count = ACT_MAX;
 		} else {
-			m->act_count -= min(m->act_count, ACT_DECLINE);
+			if (EXPERIMENTAL_PAGEOUT) {
+				if (m->act_count > 1) {
+					m->act_count /= 2;
+				} else {
+					m->act_count = 0;
+				}
+			} else {
+				m->act_count -= min(m->act_count, ACT_DECLINE);
+			}
 			act_delta = m->act_count;
 		}
 
 		/*
-		 * Move this page to the tail of the active or inactive
+		 * Move this page to the HEAD of the active or inactive
 		 * queue depending on usage.
 		 */
 		if (act_delta == 0) {
 			/* Dequeue to avoid later lock recursion. */
 			vm_page_dequeue_locked(m);
+			// Moves page to the inactive queue.
 			vm_page_deactivate(m);
 			page_shortage--;
 			pages_moved_to_inactive++;
-		} else
-			vm_page_requeue_locked(m);
+		// I'm assuming this is for the active queue, since the above
+		// condition send us to deactivate() which is for the inactive queue.
+		} else {
+			if (EXPERIMENTAL_PAGEOUT) {
+				vm_page_insert_front_self(m);
+			} else {
+				vm_page_requeue_locked(m);				
+			}
+		}
 		vm_page_unlock(m);
 	}
 	vm_pagequeue_unlock(pq);
-	log(LOG_DEBUG, "inact\tactive\tscanned\ttoInact\tto_csh\tflush\n");
-	log(LOG_DEBUG, "%d\t%d\t%d\t%d\t%d\t%d\n", inactive_queue_pages, active_queue_pages, queues_scanned, pages_moved_to_inactive, 
+	log(LOG_DEBUG, "ACTIVE PASS:\n");
+	log(LOG_DEBUG, "%-8s %-8s %-8s %-8s %-8s %-8s %-8s\n", "pass", "inact", "active", "scanned", "toInact", "2cache", "flush");
+	log(LOG_DEBUG, "%-8d %-8d %-8d %-8d %-8d %-8d %-8d\n", pass, inactive_queue_pages, active_queue_pages, queues_scanned, pages_moved_to_inactive, 
 		pages_moved_to_cache, pages_queued_for_flush);
 
 #if !defined(NO_SWAPPING)
@@ -1844,8 +1881,11 @@ vm_pageout_init(void)
 	 * page at least once every ten minutes.  This is to prevent worst
 	 * case paging behaviors with stale active LRU.
 	 */
-	if (vm_pageout_update_period == 0)
-		vm_pageout_update_period = 600;
+	//if (vm_pageout_update_period == 0)
+	//	vm_pageout_update_period = 600;
+
+	/* Altering the vm_pageout_update_period to be 10 seconds instead of 10 minutes. */
+	vm_pageout_update_period = 10;
 
 	/* XXX does not really belong here */
 	if (vm_page_max_wired == 0)

@@ -58,6 +58,8 @@
  * $FreeBSD: releng/10.3/sys/vm/vm.h 253604 2013-07-24 09:45:31Z avg $
  */
 
+#define EXPERIMENTAL_PAGEOUT 1
+
 #ifndef VM_H
 #define VM_H
 

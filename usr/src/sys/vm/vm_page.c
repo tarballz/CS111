@@ -2155,6 +2155,19 @@ vm_page_requeue_locked(vm_page_t m)
 	TAILQ_INSERT_TAIL(&pq->pq_pl, m, plinks.q);
 }
 
+// Takes a page and adds it to the head of its own queue.
+void
+vm_page_insert_front_self (vm_page_t m) {
+	struct vm_pagequeue *pq;
+
+	KASSERT(m->queue != PQ_NONE,
+	    ("vm_page_requeue_locked: page %p is not queued", m));
+	pq = vm_page_pagequeue(m);
+	vm_pagequeue_assert_locked(pq);
+	TAILQ_REMOVE(&pq->pq_pl, m, plinks.q);
+	TAILQ_INSERT_HEAD(&pq->pq_pl, m, plinks.q);
+}
+
 /*
  *	vm_page_activate:
  *
@@ -2451,10 +2464,17 @@ _vm_page_deactivate(vm_page_t m, int athead)
 			vm_pagequeue_lock(pq);
 		}
 		m->queue = PQ_INACTIVE;
-		if (athead)
+		if (EXPERIMENTAL_PAGEOUT) {
 			TAILQ_INSERT_HEAD(&pq->pq_pl, m, plinks.q);
-		else
-			TAILQ_INSERT_TAIL(&pq->pq_pl, m, plinks.q);
+		} else {
+			if (athead)
+				TAILQ_INSERT_HEAD(&pq->pq_pl, m, plinks.q);
+			else
+				TAILQ_INSERT_TAIL(&pq->pq_pl, m, plinks.q);
+		}
+		
+
+		// Now everything gets inserted to the front.
 		vm_pagequeue_cnt_inc(pq);
 		vm_pagequeue_unlock(pq);
 	}
