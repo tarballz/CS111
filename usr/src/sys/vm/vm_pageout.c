@@ -242,6 +242,15 @@ static void vm_req_vmdaemon(int req);
 #endif
 static boolean_t vm_pageout_page_lock(vm_page_t, vm_page_t *);
 
+
+/* Initializing our values to track. - Payton */
+int inactive_queue_pages = 0;
+int queues_scanned = 0;
+int active_queue_pages = 0;
+int pages_moved_to_cache = 0;
+int pages_moved_to_inactive = 0;
+int pages_queued_for_flush = 0;
+
 /*
  * Initialize a dummy page for marking the caller's place in the specified
  * paging queue.  In principle, this function only needs to set the flag
@@ -512,6 +521,8 @@ vm_pageout_flush(vm_page_t *mc, int count, int flags, int mreq, int *prunlen,
 	int i, runlen;
 
 	VM_OBJECT_ASSERT_WLOCKED(object);
+
+	pages_queued_for_flush += count;
 
 	/*
 	 * Initiate I/O.  Bump the vm_page_t->busy counter and
@@ -955,13 +966,13 @@ vm_pageout_scan(struct vm_domain *vmd, int pass)
 	boolean_t queues_locked;
 
 		
-	// Information to be logged
-	int inactive_queue_pages = 0;
-	int queues_scanned = 0;
-	int active_queue_pages = 0;
-	int pages_moved_to_cache = 0;
-	int pages_moved_to_inactive = 0;
-	int pages_queued_for_flush = 0;
+	// Information to be logged, now declared at beginning of file.
+	inactive_queue_pages = 0;
+	queues_scanned = 0;
+	active_queue_pages = 0;
+	pages_moved_to_cache = 0;
+	pages_moved_to_inactive = 0;
+	pages_queued_for_flush = 0;
 
 
 
@@ -1213,7 +1224,7 @@ vm_pageout_scan(struct vm_domain *vmd, int pass)
 			 * before being freed.  This significantly extends
 			 * the thrash point for a heavily loaded machine.
 			 */
-			pages_queued_for_flush++;
+			//pages_queued_for_flush++;
 
 			m->flags |= PG_WINATCFLS;
 			vm_pagequeue_lock(pq);
@@ -1604,6 +1615,8 @@ vm_pageout_mightbe_oom(struct vm_domain *vmd, int page_shortage,
 	 * start OOM.  Initiate the selection and signaling of the
 	 * victim.
 	 */
+	log(LOG_DEBUG, "/////\\\\\\\\ PROBABLY OOM /////\\\\\\\\\n");
+
 	vm_pageout_oom(VM_OOM_MEM);
 
 	/*
@@ -1768,7 +1781,7 @@ vm_pageout_oom(int shortage)
 	}
 
 	// asgn3 - logging
-	log( LOG_DEBUG, "Out of memory");
+	log( LOG_DEBUG, "###### Out of memory ######");
 
 	sx_sunlock(&allproc_lock);
 	if (bigproc != NULL) {
