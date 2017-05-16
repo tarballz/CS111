@@ -247,14 +247,17 @@ vm_freelist_add(struct vm_freelist *fl, vm_page_t m, int order, int tail)
 {
 
 	m->order = order;
-	if (EXPERIMENTAL_PAGEOUT) {
+
+	// asgn3 - "Inactive pages moved to the rear of the free list" 
+	// and "Invalid pages moved to the rear of the free list "
+	#if EXPERIMENTAL_PAGEOUT
 		TAILQ_INSERT_TAIL(&fl[order].pl, m, plinks.q);
-	} else {
+	#else
 		if (tail)
 			TAILQ_INSERT_TAIL(&fl[order].pl, m, plinks.q);
 		else
 			TAILQ_INSERT_HEAD(&fl[order].pl, m, plinks.q);
-	}
+	#endif
 	
 	fl[order].lcnt++;
 }
