@@ -1400,9 +1400,11 @@ relock_queues:
 		TAILQ_REMOVE(&pq->pq_pl, &vmd->vmd_marker, plinks.q);
 	}
 	vm_pagequeue_unlock(pq);
-	log(LOG_DEBUG, "INACTIVE PASS:\n");
-	log(LOG_DEBUG, "%-8s %-8s %-8s %-8s %-8s %-8s %-8s\n", "pass", "inact", "active", "scanned", "toInact", "2cache", "flush");
-	log(LOG_DEBUG, "%-8d %-8d %-8d %-8d %-8d %-8d %-8d\n", pass, inactive_queue_pages, active_queue_pages, queues_scanned, pages_moved_to_inactive, 
+	//log(LOG_DEBUG, "INACTIVE PASS:\n");
+	//log(LOG_DEBUG, "%-8s %-8s %-8s %-8s %-8s %-8s %-8s\n", "pass", "inact", "active", "scanned", "toInact", "2cache", "flush");
+	// log(LOG_DEBUG, "%-8d %-8d %-8d %-8d %-8d %-8d %-8d\n", pass, inactive_queue_pages, active_queue_pages, queues_scanned, pages_moved_to_inactive, 
+	// 	pages_moved_to_cache, pages_queued_for_flush);
+	log(LOG_DEBUG, "%d %d %d %d %d %d %d\n", pass, inactive_queue_pages, active_queue_pages, queues_scanned, pages_moved_to_inactive, 
 		pages_moved_to_cache, pages_queued_for_flush);
 
 #if !defined(NO_SWAPPING)
@@ -1550,9 +1552,11 @@ relock_queues:
 		vm_page_unlock(m);
 	}
 	vm_pagequeue_unlock(pq);
-	log(LOG_DEBUG, "ACTIVE PASS:\n");
-	log(LOG_DEBUG, "%-8s %-8s %-8s %-8s %-8s %-8s %-8s\n", "pass", "inact", "active", "scanned", "toInact", "2cache", "flush");
-	log(LOG_DEBUG, "%-8d %-8d %-8d %-8d %-8d %-8d %-8d\n", pass, inactive_queue_pages, active_queue_pages, queues_scanned, pages_moved_to_inactive, 
+	//log(LOG_DEBUG, "ACTIVE PASS:\n");
+	//log(LOG_DEBUG, "%-8s %-8s %-8s %-8s %-8s %-8s %-8s\n", "pass", "inact", "active", "scanned", "toInact", "toCache", "flush");
+	// log(LOG_DEBUG, "%-8d %-8d %-8d %-8d %-8d %-8d %-8d\n", pass, inactive_queue_pages, active_queue_pages, queues_scanned, pages_moved_to_inactive, 
+	// 	pages_moved_to_cache, pages_queued_for_flush);
+	log(LOG_DEBUG, "%d %d %d %d %d %d %d\n", pass, inactive_queue_pages, active_queue_pages, queues_scanned, pages_moved_to_inactive, 
 		pages_moved_to_cache, pages_queued_for_flush);
 
 #if !defined(NO_SWAPPING)
@@ -1615,7 +1619,7 @@ vm_pageout_mightbe_oom(struct vm_domain *vmd, int page_shortage,
 	 * start OOM.  Initiate the selection and signaling of the
 	 * victim.
 	 */
-	log(LOG_DEBUG, "/////\\\\\\\\ PROBABLY OOM /////\\\\\\\\\n");
+	//log(LOG_DEBUG, "/////\\\\\\\\ PROBABLY OOM /////\\\\\\\\\n");
 
 	vm_pageout_oom(VM_OOM_MEM);
 
@@ -1781,7 +1785,7 @@ vm_pageout_oom(int shortage)
 	}
 
 	// asgn3 - logging
-	log( LOG_DEBUG, "###### Out of memory ######");
+	///log( LOG_DEBUG, "###### Out of memory ######");
 
 	sx_sunlock(&allproc_lock);
 	if (bigproc != NULL) {
