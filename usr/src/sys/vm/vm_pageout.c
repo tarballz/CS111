@@ -1619,7 +1619,7 @@ vm_pageout_mightbe_oom(struct vm_domain *vmd, int page_shortage,
 	 * start OOM.  Initiate the selection and signaling of the
 	 * victim.
 	 */
-	//log(LOG_DEBUG, "/////\\\\\\\\ PROBABLY OOM /////\\\\\\\\\n");
+	log(LOG_DEBUG, "/////\\\\\\\\ PROBABLY OOM /////\\\\\\\\\n");
 
 	vm_pageout_oom(VM_OOM_MEM);
 
@@ -1785,7 +1785,7 @@ vm_pageout_oom(int shortage)
 	}
 
 	// asgn3 - logging
-	///log( LOG_DEBUG, "###### Out of memory ######");
+	log( LOG_DEBUG, "###### Out of memory ######");
 
 	sx_sunlock(&allproc_lock);
 	if (bigproc != NULL) {
