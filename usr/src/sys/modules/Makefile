@@ -263,6 +263,7 @@ SUBDIR=	\
 	nmdm \
 	${_nsp} \
 	nullfs \
+	cryptofs \
 	${_ntb} \
 	${_nvd} \
 	${_nve} \
