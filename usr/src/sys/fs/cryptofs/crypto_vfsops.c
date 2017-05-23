@@ -52,6 +52,8 @@
 #include <sys/vnode.h>
 #include <sys/jail.h>
 
+#include <sys/syslog.h>
+
 #include <fs/cryptofs/crypto.h>
 
 static MALLOC_DEFINE(M_CRYPTOFSMNT, "cryptofs_mount", "CRYPTOFS mount structure");
@@ -81,6 +83,7 @@ cryptofs_mount(struct mount *mp)
 	int isvnunlocked = 0, len;
 	struct nameidata nd, *ndp = &nd;
 
+	log(LOG_DEBUG, "CryptoFS trying to mount!\n");
 	CRYPTOFSDEBUG("cryptofs_mount(mp = %p)\n", (void *)mp);
 
 	/*if (!prison_allow(td->td_ucred, PR_ALLOW_MOUNT_CRYPTOFS))
