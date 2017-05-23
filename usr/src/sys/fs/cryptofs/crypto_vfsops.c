@@ -76,7 +76,7 @@ cryptofs_mount(struct mount *mp)
 	struct vnode *lowerrootvp, *vp;
 	struct vnode *cryptom_rootvp;
 	struct crypto_mount *xmp;
-	struct thread *td = curthread;
+	//struct thread *td = curthread;
 	char *target;
 	int isvnunlocked = 0, len;
 	struct nameidata nd, *ndp = &nd;

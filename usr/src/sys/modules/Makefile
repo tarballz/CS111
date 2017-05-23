@@ -79,6 +79,7 @@ SUBDIR=	\
 	${_cpufreq} \
 	${_crypto} \
 	${_cryptodev} \
+	cryptofs \
 	${_cs} \
 	${_ct} \
 	${_ctau} \

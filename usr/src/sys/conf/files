@@ -2714,6 +2714,9 @@ dev/xl/xlphy.c			optional xl pci
 fs/autofs/autofs.c		optional autofs
 fs/autofs/autofs_vfsops.c	optional autofs
 fs/autofs/autofs_vnops.c	optional autofs
+fs/cryptofs/crypto_subr.c		optional cryptofs
+fs/cryptofs/crypto_vfsops.c		optional cryptofs
+fs/cryptofs/crypto_vnops.c		optional cryptofs
 fs/deadfs/dead_vnops.c		standard
 fs/devfs/devfs_devs.c		standard
 fs/devfs/devfs_dir.c		standard
