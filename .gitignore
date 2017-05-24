@@ -1,1 +1,10 @@
-**/*.o **/*.a **/*.so **/.*~ @/ **/#*# **/export_syms **/*.ko* **/cryptofs/machine **/cryptofs/x86
+**/cryptofs/*.o
+**/cryptofs/*.a
+**/cryptofs//*.so
+**/*~
+**/cryptofs/*@*
+**/#*#
+**/cryptofs/export_syms
+**/cryptofs/*.ko*
+**/cryptofs/machine
+**/cryptofs/x86
