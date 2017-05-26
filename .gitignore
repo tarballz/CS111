@@ -8,4 +8,3 @@
 **/cryptofs/*.ko*
 **/cryptofs/machine
 **/cryptofs/x86
-*.o *.a *.so *~

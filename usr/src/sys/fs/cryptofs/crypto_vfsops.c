@@ -52,6 +52,7 @@
 #include <sys/vnode.h>
 #include <sys/jail.h>
 
+#include <sys/syslog.h>
 #include <fs/cryptofs/crypto.h>
 
 static MALLOC_DEFINE(M_CRYPTOFSMNT, "cryptofs_mount", "CRYPTOFS mount structure");
@@ -76,7 +77,7 @@ cryptofs_mount(struct mount *mp)
 	struct vnode *lowerrootvp, *vp;
 	struct vnode *cryptom_rootvp;
 	struct crypto_mount *xmp;
-	struct thread *td = curthread;
+	//struct thread *td = curthread;
 	char *target;
 	int isvnunlocked = 0, len;
 	struct nameidata nd, *ndp = &nd;
@@ -106,6 +107,9 @@ cryptofs_mount(struct mount *mp)
 	 * Get argument
 	 */
 	error = vfs_getopt(mp->mnt_optnew, "target", (void **)&target, &len);
+	if (error){ 
+		error = vfs_getopt(mp->mnt_optnew, "from", (void **)&target, &len);
+	}
 	if (error || target[len - 1] != '\0')
 		return (EINVAL);
 

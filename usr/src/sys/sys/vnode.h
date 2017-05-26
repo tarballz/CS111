@@ -407,11 +407,20 @@ extern int		vttoif_tab[];
 
 #ifdef DIAGNOSTIC
 #define	VATTR_NULL(vap)	vattr_null(vap)
+// Might be unnecessary.
+#define	VATTR_CRYPTO(vap)	vattr_null(vap)
 #else
 #define	VATTR_NULL(vap)	(*(vap) = va_null)	/* initialize a vattr */
+// Might be unnecessary.
+#define	VATTR_CRYPTO(vap)	(*(vap) = va_null)	/* initialize a vattr */
 #endif /* DIAGNOSTIC */
 
-#define	NULLVP	((struct vnode *)NULL)
+#define	NULLVP	 ((struct vnode *)NULL)
+/*
+ * Adding CRYPTOVP for sake of uniformity.
+ * - Payton
+ */
+#define CRYPTOVP ((struct vnode *)NULL)
 
 /*
  * Global vnode data.
