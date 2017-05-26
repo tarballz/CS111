@@ -6,18 +6,19 @@
 
 SRCS = encrypt.c rijndael.c
 INCS = rijndael.h
-PROGS = encrypt
+PROGS = protectfile
 OTHERS = testfile Makefile
 DIR = $(notdir $(PWD))
 TAR = tar
 TARFILE = aes.tgz
+RM = rm
 
 COBJS = rijndael.o
 CFLAGS = -O3
 
 all: $(PROGS)
 
-encrypt: encrypt.o $(COBJS) $(INCS)
+protectfile: encrypt.o $(COBJS) $(INCS)
 	$(CC) $(CFLAGS) -o $@ encrypt.o $(COBJS)
 
 rijndael.o: rijndael.h

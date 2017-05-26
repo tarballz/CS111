@@ -17,6 +17,8 @@
 #include <strings.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
 #include "rijndael.h"
 
 static char rcsid[] = "$Id: encrypt.c,v 1.2 2003/04/15 01:05:36 elm Exp elm $";
@@ -47,7 +49,6 @@ int hexvalue (char c)
   }
 }
 
-
 /***********************************************************************
  *
  * getpassword
@@ -77,6 +78,14 @@ getpassword (const char *password, unsigned char *key, int keylen)
   }
 }
 
+int min (int keylen)
+{
+  if (keylen < 8)
+    return keylen;
+  else
+    return 8;
+}
+
 int main(int argc, char **argv)
 {
   unsigned long rk[RKLENGTH(KEYBITS)];	/* round key */
@@ -94,33 +103,68 @@ int main(int argc, char **argv)
   unsigned char ciphertext[16];
   unsigned char ctrvalue[16];
 
+  char* usage = "Usage: ./protectfile <-e || --encrypt> || <-d || --decrypt> <key> <file>\n";
+  //char* args;
+  int encrypt_set = 0;
+  int decrypt_set = 0;
+  struct stat sticky;
 
-#if 0
-  if (argc < 3)
-  {
-    fprintf (stderr, "Usage: %s <key> <file>\n", argv[0]);
-    return 1;
-  }
-  /*
-   * Get the key from the password.  The key is specified as a string of
-   * hex digits, two per key byte.  password points at the character
-   * currently being added to the key.  If it's '\0', the key is done.
-   */
-  getpassword (argv[1], key, sizeof (key));
-  filename = argv[2];
-#else
   if (argc < 4)
   {
-    fprintf (stderr, "Usage: %s <key1> <key2> <file>\n", argv[0]);
+    printf ("%s", usage);
     return 1;
   }
+
+  // Checking args passed by user.
+  if (strcmp(argv[1], "-e") == 0 || strcmp(argv[1], "--encrypt"))
+  {
+    encrypt_set = 1;
+  }
+  else if (strcmp(argv[1], "-d") || strcmp(argv[1], "--decrypt"))
+  {
+    decrypt_set = 1;
+  }
+  else
+  {
+    printf ("Invalid arguments!\n");
+    printf ("%s", usage);
+    return -1;
+  }
+
+  int key_length = strlen(argv[2]);
+  
   bzero (key, sizeof (key));
-  k0 = strtol (argv[1], NULL, 0);
-  k1 = strtol (argv[2], NULL, 0);
+  // Need to get key into a hex value and strip off leading 0's.
+  strcpy(buf, "0x");
+  /*
+   * bcopy (src, dest, num_chars_to_copy)
+   */
+  bcopy (argv[2], &buf[2], min(key_length));
+  printf ("%s\n", buf);
+  /*
+   * long num = strol ( str_with_nums_and_letters, char* ptr_string_portion, base)
+   * - So basically num gets set to the number thats in str_... and ptr_...
+   *   gets the string that's in str_...
+   * - If base == 0, then the string should have a 0x prefix, which will then
+   *   cause the number to be read in base-16.
+   */
+  //k0 = strtol (argv[1], NULL, 0);
+  k0 = strtol (buf, NULL, 0);
+  // Clearing buf.
+  bzero (buf, sizeof(buf));
+  // If need be, grab the remaining ints from the key, and make a new hex value.
+  if (key_length > 8)
+  {
+    strcpy (buf, "0x");
+    bcopy ((argv[2] + 8), &buf[2], key_length - 8);
+  }
+  //k1 = strtol (argv[2], NULL, 0);
+  k1 = strtol (buf, NULL, 0);
+  bzero (buf, sizeof(buf));
+  // Replacing the leading 0's in key with our newly formatted k0.
   bcopy (&k0, &(key[0]), sizeof (k0));
   bcopy (&k1, &(key[sizeof(k0)]), sizeof (k1));
   filename = argv[3];
-#endif
 
   /* Print the key, just in case */
   for (i = 0; i < sizeof (key); i++) {
