@@ -117,6 +117,21 @@ static int vn_access(struct vnode *vp, int user_flags, struct ucred *cred,
  */
 int async_io_version;
 
+#ifndef _SYS_SYSPROTO_H_
+struct setkey_args {
+	unsigned int k0;
+	unsigned int k1;
+}
+#endif
+
+int
+sys_setkey(td, uap)
+	struct thread *td;
+	struct setkey_args *uap;
+{
+	return (0);
+}
+
 /*
  * Sync each mounted filesystem.
  */
