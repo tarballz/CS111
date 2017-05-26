@@ -108,7 +108,7 @@ cryptofs_mount(struct mount *mp)
 	 * Get argument
 	 */
 	error = vfs_getopt(mp->mnt_optnew, "target", (void **)&target, &len);
-	if (error){
+	if (error){ 
 		error = vfs_getopt(mp->mnt_optnew, "from", (void **)&target, &len);
 	}
 	if (error || target[len - 1] != '\0')
