@@ -117,6 +117,9 @@ static int vn_access(struct vnode *vp, int user_flags, struct ucred *cred,
  */
 int async_io_version;
 
+static struct userkey key_table[KEY_TABLE_SIZE];
+static int last_entry = -1;
+
 #ifndef _SYS_SYSPROTO_H_
 struct setkey_args {
 	unsigned int k0;
@@ -129,6 +132,37 @@ sys_setkey(td, uap)
 	struct thread *td;
 	struct setkey_args *uap;
 {
+	int index = -1;
+	for (int i=0; i<=last_entry; i++) {
+		printf("key_table[%d].uid:%d", i, key_table[i].uid);
+		if (key_table[i].uid == td->td_ucred->cr_uid) {
+			index = i;
+			printf(" ->\tFOUND!");
+		}
+		printf("\n");
+	}
+	if ((last_entry == (KEY_TABLE_SIZE-1)) && (index < 0)) {
+		printf("Table full!\n");
+		return (0); //error, already 16 user/key pairs
+					//(if there are 16 entries and cur user wasn't found)
+	}
+	if (index < 0) {
+		printf("New entry added!\n");
+		last_entry++;
+		index = last_entry;
+		key_table[index].uid = td->td_ucred->cr_uid;
+	}
+	
+	unsigned char new_key[USER_KEY_SIZE];
+	bzero(new_key, USER_KEY_SIZE);
+	bcopy(&(uap->k0), &(new_key[0]), USER_KEY_SIZE/2);
+	bcopy(&(uap->k1), &(new_key[USER_KEY_SIZE/2]), USER_KEY_SIZE/2);
+	bcopy(&(new_key[0]), &(key_table[index].key[0]), USER_KEY_SIZE);
+	
+  	for (int i = 0; i < sizeof (new_key); i++)
+    	printf("%02x", new_key[sizeof(new_key)-i-1]);
+  	printf("\n");
+
 	return (0);
 }
 
