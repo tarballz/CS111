@@ -19,11 +19,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include "rijndael.h"
 
 static char rcsid[] = "$Id: encrypt.c,v 1.2 2003/04/15 01:05:36 elm Exp elm $";
 
 #define KEYBITS 128
+#define STICKY  0001000
 
 /***********************************************************************
  *
@@ -78,7 +80,8 @@ getpassword (const char *password, unsigned char *key, int keylen)
   }
 }
 
-int min (int keylen)
+/* Used to grab the second half of the key if needed */
+int second_half (int keylen)
 {
   if (keylen < 8)
     return keylen;
@@ -107,7 +110,7 @@ int main(int argc, char **argv)
   //char* args;
   int encrypt_set = 0;
   int decrypt_set = 0;
-  struct stat sticky;
+  struct stat file_stat;
 
   if (argc < 4)
   {
@@ -128,7 +131,7 @@ int main(int argc, char **argv)
   {
     printf ("Invalid arguments!\n");
     printf ("%s", usage);
-    return -1;
+    return 1;
   }
 
   int key_length = strlen(argv[2]);
@@ -139,7 +142,8 @@ int main(int argc, char **argv)
   /*
    * bcopy (src, dest, num_chars_to_copy)
    */
-  bcopy (argv[2], &buf[2], min(key_length));
+  // Creating 0xdeadbeef
+  bcopy (argv[2], &buf[2], second_half (key_length));
   printf ("%s\n", buf);
   /*
    * long num = strol ( str_with_nums_and_letters, char* ptr_string_portion, base)
@@ -148,8 +152,8 @@ int main(int argc, char **argv)
    * - If base == 0, then the string should have a 0x prefix, which will then
    *   cause the number to be read in base-16.
    */
-  //k0 = strtol (argv[1], NULL, 0);
   k0 = strtol (buf, NULL, 0);
+  printf ("k0: %d\n", k0);
   // Clearing buf.
   bzero (buf, sizeof(buf));
   // If need be, grab the remaining ints from the key, and make a new hex value.
@@ -158,8 +162,16 @@ int main(int argc, char **argv)
     strcpy (buf, "0x");
     bcopy ((argv[2] + 8), &buf[2], key_length - 8);
   }
-  //k1 = strtol (argv[2], NULL, 0);
   k1 = strtol (buf, NULL, 0);
+  printf ("k1: %d\n", k1);
+
+  // Might want to delete this.  Check with Jake.
+  if (k0 == 0 && k1 == 0)
+  {
+    fprintf(stderr, "Encryption / Decryption disabled for this user.\n");
+    exit (-1);
+  }
+  
   bzero (buf, sizeof(buf));
   // Replacing the leading 0's in key with our newly formatted k0.
   bcopy (&k0, &(key[0]), sizeof (k0));
@@ -171,7 +183,7 @@ int main(int argc, char **argv)
     sprintf (buf+2*i, "%02x", key[sizeof(key)-i-1]);
   }
   fprintf (stderr, "KEY: %s\n", buf);
-
+  
   /*
    * Initialize the Rijndael algorithm.  The round key is initialized by this
    * call from the values passed in key and KEYBITS.
@@ -184,10 +196,29 @@ int main(int argc, char **argv)
   fd = open(filename, O_RDWR);
   if (fd < 0)
   {
-    fprintf(stderr, "Error opening file %s\n", argv[2]);
+    fprintf(stderr, "Error opening file %s\n", argv[argc - 1]);
     return 1;
   }
 
+  // Need the inode number of fd.
+  if (fstat(fd, &file_stat) < 0)
+  {
+    fprintf (stderr, "Unable to get stats from file %s\n", argv[argc - 1]);
+    return 1;
+  }
+
+  fileId = file_stat.st_ino;
+  // Testing
+  printf("%s inode num: %d\n", argv[argc - 1], fileId);
+
+  // fd permissions = protection_mode AND NOT(sticky)
+  if (fchmod(fd, file_stat.st_mode & ~(STICKY)))
+  {
+    printf("Cannot unset sticky bit!\n");
+    return 1;
+  }
+  
+  
   /* fileID goes into bytes 8-11 of the ctrvalue */
   bcopy (&fileId, &(ctrvalue[8]), sizeof (fileId));
 
@@ -208,6 +239,15 @@ int main(int argc, char **argv)
     {
       perror ("Unable to seek back over buffer");
       exit (-1);
+    }
+
+    // Padding with zeros so userspace matches kernelspace.
+    if (nbytes < 16)
+    {
+      for (int i = nbytes; i < 16; i++)
+      {
+        filedata[i] = 0;
+      }
     }
 
     /* Set up the CTR value to be encrypted */
@@ -233,6 +273,25 @@ int main(int argc, char **argv)
 
     /* Increment the total bytes written */
     totalbytes += nbytes;
+  }
+
+  if (fstat(fd, &file_stat) < 0)
+  {
+    fprintf (stderr, "Unable to get stats from file %s\n", argv[argc - 1]);
+    return 1;
+  }
+
+  if (encrypt_set)
+  {
+    if (fchmod(fd, file_stat.st_mode | STICKY)){
+      printf("chmod:  Unable to encrypt.  Are you using sudo?\n");
+    }
+  }
+  else if (decrypt_set)
+  {
+    if (fchmod(fd, file_stat.st_mode & ~(STICKY))){
+      printf("chmod:  Unable to decrypt.  Are you using sudo?\n");
+    }
   }
   close (fd);
 }

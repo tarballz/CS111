@@ -28,8 +28,8 @@ tarball:
 
 test: all
 	cp testfile testfile.orig~
-	./encrypt 0x1234 0x5678 testfile
-	./encrypt 0x1234 0x5678 testfile
+	./protectfile 0x1234 0x5678 testfile
+	./protectfile 0x1234 0x5678 testfile
 	diff testfile testfile.orig~
 
 clean:
