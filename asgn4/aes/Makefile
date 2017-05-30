@@ -35,5 +35,6 @@ test: all
 clean:
 	$(RM) *~ *.o
 
-spotless: clean
+spotless:
 	$(RM) $(PROGS)
+	clean

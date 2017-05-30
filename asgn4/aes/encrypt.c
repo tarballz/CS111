@@ -25,7 +25,7 @@
 static char rcsid[] = "$Id: encrypt.c,v 1.2 2003/04/15 01:05:36 elm Exp elm $";
 
 #define KEYBITS 128
-#define STICKY  0001000
+#define STICKY  01000
 
 /***********************************************************************
  *
@@ -106,7 +106,7 @@ int main(int argc, char **argv)
   unsigned char ciphertext[16];
   unsigned char ctrvalue[16];
 
-  char* usage = "Usage: ./protectfile <-e || --encrypt> || <-d || --decrypt> <key> <file>\n";
+  char* usage = "Usage: ./protectfile <-e || --encrypt> || <-d || --decrypt> <KEY || KEY1 KEY2> <file>\n";
   //char* args;
   int encrypt_set = 0;
   int decrypt_set = 0;
@@ -134,16 +134,23 @@ int main(int argc, char **argv)
     return 1;
   }
 
+  // Need to strip off leading 0x if user provides key in hex form.
+  if (argv[2][0] == '0' && (argv[2][1] == 'x' || argv[2][2] == 'X'))
+  {
+    printf("it\'s hex.\n");
+    argv[2] += 2;
+  }
+
   int key_length = strlen(argv[2]);
-  
+
   bzero (key, sizeof (key));
   // Need to get key into a hex value and strip off leading 0's.
-  strcpy(buf, "0x");
+  strcpy (buf, "0x");
   /*
    * bcopy (src, dest, num_chars_to_copy)
    */
-  // Creating 0xdeadbeef
-  bcopy (argv[2], &buf[2], second_half (key_length));
+  // Creating "0xdeadbeef" or whatever.
+  bcopy (argv[2], &buf[2], second_half(key_length));
   printf ("%s\n", buf);
   /*
    * long num = strol ( str_with_nums_and_letters, char* ptr_string_portion, base)
@@ -200,18 +207,20 @@ int main(int argc, char **argv)
     return 1;
   }
 
-  // Need the inode number of fd.
+  // Opening the inode of fd.
   if (fstat(fd, &file_stat) < 0)
   {
     fprintf (stderr, "Unable to get stats from file %s\n", argv[argc - 1]);
     return 1;
   }
 
+  // inode "number" of fd.
   fileId = file_stat.st_ino;
   // Testing
   printf("%s inode num: %d\n", argv[argc - 1], fileId);
 
   // fd permissions = protection_mode AND NOT(sticky)
+  // Unsetting sticky-bit.
   if (fchmod(fd, file_stat.st_mode & ~(STICKY)))
   {
     printf("Cannot unset sticky bit!\n");
