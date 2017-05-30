@@ -106,7 +106,7 @@ int main(int argc, char **argv)
   unsigned char ciphertext[16];
   unsigned char ctrvalue[16];
 
-  char* usage = "Usage: ./protectfile <-e || --encrypt> || <-d || --decrypt> <KEY || KEY1 KEY2> <file>\n";
+  char* usage = "Usage: ./protectfile <-e || --encrypt> || <-d || --decrypt> <KEY> <file>\n";
   //char* args;
   int encrypt_set = 0;
   int decrypt_set = 0;
