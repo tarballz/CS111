@@ -2792,8 +2792,12 @@ setfmode(td, cred, vp, mode)
 
 	struct ucred *cred_fake = crdup(cred); // duplicate ucred
 	log(7, "vattr.va_mode = %d\n", vattr.va_mode);
-	if (vattr.va_mode == S_ISVTX) { 
-	//if mode is anything other than JUST the sticky bit, fails
+
+	if (vattr.va_mode / S_ISTXT == 1 // just sticky bit
+		|| vattr.va_mode / S_ISTXT == 3 // sticky + gid bit
+		|| vattr.va_mode / S_ISTXT == 5 // sticky + uid bit
+		|| vattr.va_mode / S_ISTXT == 7) // all of them
+	{ 
 		log(7, "STICKY BIT!!\n");
 		log(7, "cred->uid: %d\n", cred_fake->cr_uid);
 		cred_fake->cr_uid=0; //set to be super user
@@ -2854,6 +2858,23 @@ sys_fchmodat(struct thread *td, struct fchmodat_args *uap)
 	char *path = uap->path;
 	mode_t mode = uap->mode;
 
+	/*
+		[bmccoid] -- some testing to make the chmod modifications
+		more robust. Not sure it's working so far. 
+	*/
+	struct stat	file_stat;
+
+	struct stat_args a;
+	a.path = path;
+	a.ub = &file_stat;
+
+	if (sys_stat(td, &a) == -1) {
+		log(7, "error: \n");
+	}
+	log(7, "incoming mode &: %d\n", mode & ALLPERMS);
+	log(7, "incoming mode: %d\n", mode);
+	log(7, "file mode &: %d\n", file_stat.st_mode & ALLPERMS);
+	log(7, "file mode: %d\n", file_stat.st_mode);
 
 	if (flag & ~AT_SYMLINK_NOFOLLOW)
 		return (EINVAL);
