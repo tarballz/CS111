@@ -85,6 +85,69 @@ static __inline int	lim_shared(struct plimit *limp);
 /*
  * Resource controls and accounting.
  */
+
+static struct userkey key_table[KEY_TABLE_SIZE];
+static int last_entry = -1;
+int get_key(int, unsigned char*);
+
+#ifndef _SYS_SYSPROTO_H_
+struct setkey_args {
+	unsigned int k0;
+	unsigned int k1;
+}
+#endif
+
+int
+sys_setkey(td, uap)
+	struct thread *td;
+	struct setkey_args *uap;
+{
+	int index = -1;
+	for (int i=0; i<=last_entry; i++) {
+		printf("key_table[%d].uid:%d", i, key_table[i].uid);
+		if (key_table[i].uid == td->td_ucred->cr_uid) {
+			index = i;
+			printf(" ->\tFOUND!");
+		}
+		printf("\n");
+	}
+	if ((last_entry == (KEY_TABLE_SIZE-1)) && (index < 0)) {
+		printf("Table full!\n");
+		return (0); //error, already 16 user/key pairs
+					//(if there are 16 entries and cur user wasn't found)
+	}
+	if (index < 0) {
+		printf("New entry added!\n");
+		last_entry++;
+		index = last_entry;
+		key_table[index].uid = td->td_ucred->cr_uid;
+	}
+	
+	unsigned char new_key[USER_KEY_SIZE];
+	bzero(new_key, USER_KEY_SIZE);
+	bcopy(&(uap->k0), &(new_key[0]), USER_KEY_SIZE/2);
+	bcopy(&(uap->k1), &(new_key[USER_KEY_SIZE/2]), USER_KEY_SIZE/2);
+	bcopy(&(new_key[0]), &(key_table[index].key[0]), USER_KEY_SIZE);
+	
+  	for (int i = 0; i < sizeof (new_key); i++)
+    	printf("%02x", new_key[sizeof(new_key)-i-1]);
+  	printf("\n");
+
+	return (0);
+}
+
+int 
+get_key(int uid, unsigned char *k)
+{
+	for(int i=0; i<=last_entry; i++) {
+		if (key_table[i].uid == uid) {
+			bcopy(&(key_table[i].key[0]), &(k[0]), 8);
+			return 0;
+		}
+	}
+	return 1;
+}
+
 #ifndef _SYS_SYSPROTO_H_
 struct getpriority_args {
 	int	which;
