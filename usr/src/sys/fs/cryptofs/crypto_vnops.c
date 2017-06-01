@@ -188,6 +188,11 @@
 #include <vm/vm_object.h>
 #include <vm/vnode_pager.h>
 
+// Asgn4 code - kdolev -------------------------------------------
+#include  <sys/types.h>
+#include  <sys/syslog.h>
+// ---------------------------------------------------------------
+
 MALLOC_DEFINE(M_CRYPTOFSBUF, "cryptofs_buf", "CryptoFS Buffer");
 
 static int crypto_bug_bypass = 0;   /* for debugging: enables bypass printf'ing */
@@ -629,6 +634,131 @@ crypto_rmdir(struct vop_rmdir_args *ap)
 	return (crypto_bypass(&ap->a_gen));
 }
 
+// Asgn4 code - kdolev -------------------------------------------
+#define BUFSIZE 512
+
+static void
+log_uio(struct uio *uio) {
+	struct iovec *iov;
+	char *iov_base;
+	iov = uio->uio_iov;
+	iov_base = iov->iov_base;
+	char* segflag;
+	char* rw;
+	switch (uio->uio_segflg) {
+		case UIO_USERSPACE:
+			segflag = "UIO_USERSPACE";
+			break;
+
+		case UIO_SYSSPACE:
+			segflag = "UIO_SYSSPACE";
+			break;
+		case UIO_NOCOPY:
+			segflag = "UIO_NOCOPY";
+			break;
+	}
+	switch (uio->uio_rw) {
+		case UIO_READ:
+			rw = "UIO_READ";
+			break;
+
+		case UIO_WRITE:
+			rw = "UIO_WRITE";
+			break;
+	}
+    log(LOG_DEBUG, "UIO Data------------------------\n" );
+    log(LOG_DEBUG, "iov_base %p\n"    , iov_base);
+    log(LOG_DEBUG, "iov_length %zd\n" , iov->iov_len);
+    log(LOG_DEBUG, "uio_iovcnt %d\n"  , uio->uio_iovcnt);
+    log(LOG_DEBUG, "uio_offset %zd\n" , uio->uio_offset);
+    log(LOG_DEBUG, "uio_resid %zd\n"  , uio->uio_resid);
+    log(LOG_DEBUG, "uio_segflag %s\n" , segflag);
+    log(LOG_DEBUG, "uio_rw %s\n"      , rw);
+    log(LOG_DEBUG, "--------------------------------\n" );
+	return;
+}
+
+static void
+log_buffer (char* buffer, int amnt) {
+	for(int i = 0; i < amnt; i++) {
+		log(LOG_DEBUG, "%c",buffer[i]);
+	}
+	log(LOG_DEBUG, "\n");
+}
+
+//encrypt()
+//input  : buffer of size BUFSIZE
+//effect : encrypts bytes in buffer
+static void
+encrypt (char* buffer, int amnt) {
+	for(int i = 0; i < amnt; i++) {
+		if(buffer[i] != '\n')
+			buffer[i] = ~buffer[i];
+	}
+}
+
+static int
+crypto_read(struct vop_read_args *ap)
+{
+	char* buffer;
+    static int amnt = 0;
+	
+	//set up vars
+	struct uio* uio = ap->a_uio;
+	amnt = uio->uio_resid;
+
+	//setup buffer
+	buffer = (char *)uio->uio_iov->iov_base;
+
+	//read
+	VTOCRYPTO(ap->a_vp)->crypto_flags |= CRYPTOV_DROP;
+	int error = crypto_bypass(&ap->a_gen);
+
+	//calculate amount of data read
+	amnt = amnt - uio->uio_resid;
+	log(LOG_DEBUG, "amnt: %d\n", amnt);
+
+	//set up buffer
+	log(LOG_DEBUG, "buffer before encryption\n");
+	log_buffer(buffer, amnt);
+
+	//encrypt
+    encrypt(buffer, amnt);
+    log(LOG_DEBUG, "buffer after encryption\n");
+	log_buffer(buffer, amnt);	
+
+	return (error);
+}
+
+static int
+crypto_write(struct vop_write_args *ap)
+{
+	char* buffer;
+    static int amnt = 0;
+	
+	//set up vars
+	struct uio* uio = ap->a_uio;
+	amnt = uio->uio_resid;
+
+	//setup buffer
+	buffer = (char *)uio->uio_iov->iov_base;
+	log(LOG_DEBUG, "buffer before encryption\n");
+	log_buffer(buffer, amnt);
+
+	//encrypt
+    encrypt(buffer, amnt);
+
+    log(LOG_DEBUG, "buffer after encryption\n");
+	log_buffer(buffer, amnt);
+
+	//read
+	VTOCRYPTO(ap->a_vp)->crypto_flags |= CRYPTOV_DROP;
+	int error = crypto_bypass(&ap->a_gen);
+
+	return (error);
+}
+// ---------------------------------------------------------------
+
 /*
  * We need to process our own vnode lock and then clear the
  * interlock flag as it applies only to our vnode, not the
@@ -934,6 +1064,8 @@ struct vop_vector crypto_vnodeops = {
 	.vop_setattr =		crypto_setattr,
 	.vop_strategy =		VOP_EOPNOTSUPP,
 	.vop_unlock =		crypto_unlock,
+    .vop_read =         crypto_read,   //asgn4 code - kdolev
+    .vop_write =        crypto_write,  //asgn4 code - kdolev
 	.vop_vptocnp =		crypto_vptocnp,
 	.vop_vptofh =		crypto_vptofh,
 	.vop_add_writecount =	crypto_add_writecount,
