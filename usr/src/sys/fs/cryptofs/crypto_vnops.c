@@ -686,6 +686,7 @@ log_buffer (char* buffer, int amnt) {
 	log(LOG_DEBUG, "\n");
 }
 
+//a dummy encryption function
 //encrypt()
 //input  : buffer of size BUFSIZE
 //effect : encrypts bytes in buffer
@@ -709,7 +710,7 @@ crypto_read(struct vop_read_args *ap)
 
 	//Get keys -----------------------------
 	//TO BE IMPLEMENTED
-	
+
 	int k0 = 1;
 	int k1 = 1;
 
