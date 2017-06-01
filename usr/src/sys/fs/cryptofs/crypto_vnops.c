@@ -636,6 +636,7 @@ crypto_rmdir(struct vop_rmdir_args *ap)
 
 // Asgn4 code - kdolev -------------------------------------------
 #define BUFSIZE 512
+#define STICKY  0001000
 
 static void
 log_uio(struct uio *uio) {
@@ -700,34 +701,82 @@ encrypt (char* buffer, int amnt) {
 static int
 crypto_read(struct vop_read_args *ap)
 {
-	char* buffer;
+	struct vnode *vp = ap->a_vp;
+	struct vnode *lvp = CRYPTOVPTOLOWERVP(vp);
+	//struct uio *uio = ap->a_uio;
+	struct vattr va;
+	VOP_GETATTR(lvp, &va, ap->a_cred);
+	size_t va_size = va.va_size;
+	char* buffer = NULL;
+	char* og_buffer = NULL;
     static int amnt = 0;
+
+    if (vp->v_type != VREG)
+    	return (EOPNOTSUPP);
+    if (uio->uio_resid == 0)
+    	return 0;
+    if (va_size <= uio->uio_offset)
+    	return 0;
 	
 	//set up vars
 	struct uio* uio = ap->a_uio;
 	amnt = uio->uio_resid;
 
-	//setup buffer
-	buffer = (char *)uio->uio_iov->iov_base;
+	if (va.va_mode & STICKY)
+	{
+		// Preserving original values.
+		size_t og_len = uio->uio_iov->iov_len;
+		size_t og_offset = uio->uio_offset;
+		size_t nbytes;
 
-	//read
-	VTOCRYPTO(ap->a_vp)->crypto_flags |= CRYPTOV_DROP;
-	int error = crypto_bypass(&ap->a_gen);
+		//setup buffer
+		og_buffer = (char *)uio->uio_iov->iov_base;
 
-	//calculate amount of data read
-	amnt = amnt - uio->uio_resid;
-	log(LOG_DEBUG, "amnt: %d\n", amnt);
+		// Malloc'ing 16 extra bytes to pad out to blocksize.
+		buffer = malloc(va_size + 16, M_CRYPTOFSBUF, M_WAITOK);
 
-	//set up buffer
-	log(LOG_DEBUG, "buffer before encryption\n");
-	log_buffer(buffer, amnt);
+		/*
+		 * Setting uio flag to kernel-space so we can get data from
+         * the read() into a kernel buff for decryption.
+		 */
+		uio->uio_segflg = UIO_SYSSPACE;
 
-	//encrypt
-    encrypt(buffer, amnt);
-    log(LOG_DEBUG, "buffer after encryption\n");
-	log_buffer(buffer, amnt);	
+		// Setting uio buff to our new kernel buff
+		uio->uio_iov->iov_base = buffer;
 
-	return (error);
+		// Reading the whole file.
+		uio->uio_iov->iov_len = va_size;
+		uio->uio_resid = va_size;
+		uio->uio_offset = 0;
+
+		//read
+		int error = VOP_READ(lvp, uio, ap->a_ioflag, ap->a_cred);
+
+		// Determining how much data to read.
+		if (og_len < va_size && (va_size - og_offset) > og_len)
+			nbytes = og_len;
+		else
+			nbytes = va_size - og_offset
+
+		//calculate amount of data read
+		amnt = amnt - uio->uio_resid;
+		log(LOG_DEBUG, "amnt: %d\n", amnt);
+
+		//set up buffer
+		log(LOG_DEBUG, "buffer before encryption\n");
+		log_buffer(buffer, amnt);
+
+		//encrypt
+	    encrypt(buffer, amnt);
+	    log(LOG_DEBUG, "buffer after encryption\n");
+		log_buffer(buffer, amnt);	
+
+		return (error);
+	}
+	else
+	{
+		return VOP_READ(lvp, uio, ap->a_ioflag, ap->a_cred);
+	}
 }
 
 static int
