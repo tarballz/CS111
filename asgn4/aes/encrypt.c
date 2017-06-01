@@ -27,58 +27,6 @@ static char rcsid[] = "$Id: encrypt.c,v 1.2 2003/04/15 01:05:36 elm Exp elm $";
 #define KEYBITS 128
 #define STICKY  01000
 
-/***********************************************************************
- *
- * hexvalue
- *
- * This routine takes a single character as input, and returns the
- * hexadecimal equivalent.  If the character passed isn't a hex value,
- * the program exits.
- *
- ***********************************************************************
- */
-int hexvalue (char c)
-{
-  if (c >= '0' && c <= '9') {
-    return (c - '0');
-  } else if (c >= 'a' && c <= 'f') {
-    return (10 + c - 'a');
-  } else if (c >= 'A' && c <= 'F') {
-    return (10 + c - 'A');
-  } else {
-    fprintf (stderr, "ERROR: key digit %c isn't a hex digit!\n", c);
-    exit (-1);
-  }
-}
-
-/***********************************************************************
- *
- * getpassword
- *
- * Get the key from the password.  The key is specified as a string of
- * hex digits, two per key byte.  password points at the character
- * currently being added to the key.  If it's '\0', the key is done.
- *
- ***********************************************************************
- */
-void
-getpassword (const char *password, unsigned char *key, int keylen)
-{
-  int		i;
-
-  for (i = 0; i < keylen; i++) {
-    if (*password == '\0') {
-      key[i] = 0;
-    } else {
-      /* Add the first of two digits to the current key value */
-      key[i] = hexvalue (*(password++)) << 4;
-      /* If there's a second digit at this position, add it */
-      if (*password != '\0') {
-	key[i] |= hexvalue (*(password++));
-      }
-    }
-  }
-}
 
 /* Used to grab the second half of the key if needed */
 int second_half (int keylen)
@@ -106,13 +54,13 @@ int main(int argc, char **argv)
   unsigned char ciphertext[16];
   unsigned char ctrvalue[16];
 
-  char* usage = "Usage: ./protectfile <-e || --encrypt> || <-d || --decrypt> <KEY> <file>\n";
+  char* usage = "Usage: ./protectfile <-e || --encrypt> || <-d || --decrypt> <key1> <key2> <file>\n";
   //char* args;
   int encrypt_set = 0;
   int decrypt_set = 0;
   struct stat file_stat;
 
-  if (argc < 4)
+  if (argc < 5)
   {
     printf ("%s", usage);
     return 1;
@@ -140,50 +88,58 @@ int main(int argc, char **argv)
     printf("it\'s hex.\n");
     argv[2] += 2;
   }
+  if (argv[3][0] == '0' && (argv[3][1] == 'x' || argv[3][2] == 'X'))
+  {
+    printf("it\'s hex.\n");
+    argv[2] += 2;
+  }
 
   int key_length = strlen(argv[2]);
 
   bzero (key, sizeof (key));
   // Need to get key into a hex value and strip off leading 0's.
-  strcpy (buf, "0x");
-  /*
-   * bcopy (src, dest, num_chars_to_copy)
-   */
-  // Creating "0xdeadbeef" or whatever.
-  bcopy (argv[2], &buf[2], second_half(key_length));
-  printf ("%s\n", buf);
-  /*
-   * long num = strol ( str_with_nums_and_letters, char* ptr_string_portion, base)
-   * - So basically num gets set to the number thats in str_... and ptr_...
-   *   gets the string that's in str_...
-   * - If base == 0, then the string should have a 0x prefix, which will then
-   *   cause the number to be read in base-16.
-   */
-  k0 = strtol (buf, NULL, 0);
-  printf ("k0: %d\n", k0);
-  // Clearing buf.
-  bzero (buf, sizeof(buf));
-  // If need be, grab the remaining ints from the key, and make a new hex value.
-  if (key_length > 8)
-  {
-    strcpy (buf, "0x");
-    bcopy ((argv[2] + 8), &buf[2], key_length - 8);
-  }
-  k1 = strtol (buf, NULL, 0);
-  printf ("k1: %d\n", k1);
 
-  // Might want to delete this.  Check with Jake.
-  if (k0 == 0 && k1 == 0)
-  {
-    fprintf(stderr, "Encryption / Decryption disabled for this user.\n");
-    exit (-1);
-  }
-  
-  bzero (buf, sizeof(buf));
+  // Removing a bunch of shit to make this accept 2 keys instead of 1.
+  #if 0
+    // Creating "0xdeadbeef" or whatever.
+    bcopy (argv[2], &buf[2], second_half(key_length));
+    printf ("%s\n", buf);
+    /*
+     * long num = strol ( str_with_nums_and_letters, char* ptr_string_portion, base)
+     * - So basically num gets set to the number thats in str_... and ptr_...
+     *   gets the string that's in str_...
+     * - If base == 0, then the string should have a 0x prefix, which will then
+     *   cause the number to be read in base-16.
+     */
+    k0 = strtol (buf, NULL, 0);
+    printf ("k0: %d\n", k0);
+    // Clearing buf.
+    bzero (buf, sizeof(buf));
+    // If need be, grab the remaining ints from the key, and make a new hex value.
+    if (key_length > 8)
+    {
+      strcpy (buf, "0x");
+      bcopy ((argv[2] + 8), &buf[2], key_length - 8);
+    }
+    k1 = strtol (buf, NULL, 0);
+    printf ("k1: %d\n", k1);
+
+    // Might want to delete this.  Check with Jake.
+    if (k0 == 0 && k1 == 0)
+    {
+      fprintf(stderr, "Encryption / Decryption disabled for this user.\n");
+      exit (-1);
+    }
+    
+    bzero (buf, sizeof(buf));
+  #else
+    k0 = strtol (argv[2], NULL, 0);
+    k1 = strtol (argv[3], NULL, 0);
+  #endif
   // Replacing the leading 0's in key with our newly formatted k0.
   bcopy (&k0, &(key[0]), sizeof (k0));
   bcopy (&k1, &(key[sizeof(k0)]), sizeof (k1));
-  filename = argv[3];
+  filename = argv[argc - 1];
 
   /* Print the key, just in case */
   for (i = 0; i < sizeof (key); i++) {
@@ -293,13 +249,15 @@ int main(int argc, char **argv)
   if (encrypt_set)
   {
     if (fchmod(fd, file_stat.st_mode | STICKY)){
-      printf("chmod:  Unable to encrypt.  Are you using sudo?\n");
+      // For some reason it works without sudo lol
+      //printf("chmod:  Error encrypting.  Are you using sudo?\n");
     }
   }
   else if (decrypt_set)
   {
     if (fchmod(fd, file_stat.st_mode & ~(STICKY))){
-      printf("chmod:  Unable to decrypt.  Are you using sudo?\n");
+      // For some reason it works without sudo lol
+      //printf("chmod:  Error decrypting.  Are you using sudo?\n");
     }
   }
   close (fd);
