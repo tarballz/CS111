@@ -366,4 +366,6 @@ struct userkey {
 	unsigned char key[USER_KEY_SIZE];
 };
 
+int get_key(int, unsigned char*);
+
 #endif	/* _SYS_PARAM_H_ */

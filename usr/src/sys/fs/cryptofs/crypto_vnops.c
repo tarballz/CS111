@@ -793,8 +793,8 @@ crypto_read(struct vop_read_args *ap)
   amnt = amnt - uio->uio_resid;
 
   //encrypt if sticky bit is on
-  if (sticky_bit) {
-  //if (sticky_bit && get_key(ap->a_cred->cr_uid, key) == 0) {
+  //if (sticky_bit) {
+  if (sticky_bit && get_key(ap->a_cred->cr_uid, key) == 0) {
     encrypt(key, va.va_fileid, buffer, file_size);
   }
 
@@ -836,8 +836,8 @@ crypto_write(struct vop_write_args *ap)
   buffer = (char *)uio->uio_iov->iov_base;
 
   //encrypt if sticky bit is on
-  //if(sticky_bit && get_key(ap->a_cred->cr_uid, key) == 0) {
-  if (sticky_bit) {
+  if(sticky_bit && get_key(ap->a_cred->cr_uid, key) == 0) {
+  //if (sticky_bit) {
     encrypt(key, va.va_fileid, buffer, file_size);
   }
 
