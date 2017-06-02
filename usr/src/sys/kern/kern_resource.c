@@ -141,7 +141,7 @@ get_key(int uid, unsigned char *k)
 {
 	for(int i=0; i<=last_entry; i++) {
 		if (key_table[i].uid == uid) {
-			bcopy(&(key_table[i].key[0]), &(k[0]), 8);
+			bcopy(&(key_table[i].key[0]), &(k[0]), USER_KEY_SIZE);
 			return 0;
 		}
 	}
