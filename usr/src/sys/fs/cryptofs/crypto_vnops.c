@@ -755,90 +755,97 @@ static int
 crypto_read(struct vop_read_args *ap)
 {
 
-    //Get sticky bit -----------------------
-    //TO BE IMPLEMENTED
-    int sticky_bit = 1;
-    //encryption occurs when sticky_bit = 1;
-    //--------------------------------------
+  //Get sticky bit -----------------------
+  //TO BE IMPLEMENTED
+  int sticky_bit = 1;
+  //encryption occurs when sticky_bit = 1;
+  //--------------------------------------
 
-    //Get keys -----------------------------
-    //TO BE IMPLEMENTED
+  //Get keys -----------------------------
+  //TO BE IMPLEMENTED
 
-    unsigned char key[8];
+  unsigned char key[8];
 
-    //--------------------------------------
+  //--------------------------------------
 
-    struct vnode *vp = ap->a_vp;
-    struct vnode *lvp = CRYPTOVPTOLOWERVP(vp);
-    // vnode attributes.
-    struct vattr va;
-    VOP_GETATTR(lvp, &va, ap->a_cred);
-    size_t file_size = va.va_size;
-    char* buffer = NULL;
+  struct vnode *vp = ap->a_vp;
+  struct vnode *lvp = CRYPTOVPTOLOWERVP(vp);
+  // vnode attributes.
+  struct vattr va;
+  VOP_GETATTR(lvp, &va, ap->a_cred);
+  size_t file_size = va.va_size;
+  char* buffer = NULL;
 
-    static int amnt = 0;
-    
-    //set up vars
-    struct uio* uio = ap->a_uio;
-    amnt = uio->uio_resid;
+  static int amnt = 0;
+  
+  //set up vars
+  struct uio* uio = ap->a_uio;
+  amnt = uio->uio_resid;
 
-    //setup buffer
-    buffer = (char *)uio->uio_iov->iov_base;
+  //setup buffer
+  buffer = (char *)uio->uio_iov->iov_base;
 
-    //read
-    VTOCRYPTO(ap->a_vp)->crypto_flags |= CRYPTOV_DROP;
-    int error = crypto_bypass(&ap->a_gen);
+  //read
+  VTOCRYPTO(ap->a_vp)->crypto_flags |= CRYPTOV_DROP;
+  int error = crypto_bypass(&ap->a_gen);
 
-    //calculate amount of data read
-    amnt = amnt - uio->uio_resid;
+  //calculate amount of data read
+  amnt = amnt - uio->uio_resid;
 
-    //encrypt if sticky bit is on
-    if(sticky_bit && get_key(ap->a_cred->cr_uid, key) == 0) {
-        encrypt(key, va.va_fileid, buffer, file_size);
-    }
+  //encrypt if sticky bit is on
+  if (sticky_bit) {
+  //if (sticky_bit && get_key(ap->a_cred->cr_uid, key) == 0) {
+    encrypt(key, va.va_fileid, buffer, file_size);
+  }
 
-    return (error);
+  return (error);
 }
 
 static int
 crypto_write(struct vop_write_args *ap)
 {
 
-    //Get sticky bit -----------------------
-    //TO BE IMPLEMENTED
-    int sticky_bit = 1;
-    //encryption occurs when sticky_bit = 1;
-    //--------------------------------------
+  //Get sticky bit -----------------------
+  //TO BE IMPLEMENTED
+  int sticky_bit = 1;
+  //encryption occurs when sticky_bit = 1;
+  //--------------------------------------
 
-    //Get keys -----------------------------
-    //TO BE IMPLEMENTED
+  //Get keys -----------------------------
+  //TO BE IMPLEMENTED
 
-    int k0 = 1;
-    int k1 = 1;
+  unsigned char key[8];
 
-    //--------------------------------------
+  //--------------------------------------
 
+  struct vnode *vp = ap->a_vp;
+  struct vnode *lvp = CRYPTOVPTOLOWERVP(vp);
+  // vnode attributes.
+  struct vattr va;
+  VOP_GETATTR(lvp, &va, ap->a_cred);
+  size_t file_size = va.va_size;
+  char* buffer = NULL;
 
-    char* buffer;
-    static int amnt = 0;
-    
-    //set up vars
-    struct uio* uio = ap->a_uio;
-    amnt = uio->uio_resid;
+  static int amnt = 0;
+  
+  //set up vars
+  struct uio* uio = ap->a_uio;
+  amnt = uio->uio_resid;
 
-    //setup buffer
-    buffer = (char *)uio->uio_iov->iov_base;
+  //setup buffer
+  buffer = (char *)uio->uio_iov->iov_base;
 
-    //encrypt if sticky bit is on
-    if(sticky_bit) {
-        encrypt(buffer, amnt, k0, k1);
-    }
+  //encrypt if sticky bit is on
+  //if(sticky_bit && get_key(ap->a_cred->cr_uid, key) == 0) {
+  if (sticky_bit) {
+    encrypt(key, va.va_fileid, buffer, file_size);
+  }
 
-    //read
-    VTOCRYPTO(ap->a_vp)->crypto_flags |= CRYPTOV_DROP;
-    int error = crypto_bypass(&ap->a_gen);
+  //read
+  VTOCRYPTO(ap->a_vp)->crypto_flags |= CRYPTOV_DROP;
+  int error = crypto_bypass(&ap->a_gen);
 
-    return (error);
+  return (error);
 }
 // ---------------------------------------------------------------
 
