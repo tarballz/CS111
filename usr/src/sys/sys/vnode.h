@@ -154,6 +154,8 @@ struct vnode {
 	struct lockf *v_lockf;		/* Byte-level advisory lock list */
 	struct rangelock v_rl;			/* Byte-range lock */
 
+	int pad;					/* Padding for CryptoFS */
+
 	/*
 	 * clustering stuff
 	 */

@@ -97,6 +97,7 @@ int main(int argc, char **argv)
   int key_length = strlen(argv[2]);
 
   bzero (key, sizeof (key));
+  bzero (ctrvalue, sizeof (ctrvalue));
   // Need to get key into a hex value and strip off leading 0's.
 
   // Removing a bunch of shit to make this accept 2 keys instead of 1.
