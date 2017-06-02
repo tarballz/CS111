@@ -1,3 +1,4 @@
+#if 0
 #include <stdio.h>
 #include <fcntl.h>
 #include <strings.h>
@@ -74,3 +75,4 @@ int encrypt(unsigned char *user_key, int fileId, unsigned char *data, size_t va_
   }
   return 0;
 }
+#endif

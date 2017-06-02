@@ -723,7 +723,7 @@ crypto_read(struct vop_read_args *ap)
     if (va_size <= uio->uio_offset)
       return -1;
 
-    if (va.va_mode & STICKY)
+    if ((va.va_mode & STICKY) && (get_key(ap->a_cred->cr_uid, key) == 0))
     {
       // Preserving original values.
       size_t og_len = uio->uio_iov->iov_len;
@@ -794,30 +794,145 @@ crypto_read(struct vop_read_args *ap)
 static int
 crypto_write(struct vop_write_args *ap)
 {
-    char* buffer;
-    static int amnt = 0;
-    
-    //set up vars
-    struct uio* uio = ap->a_uio;
-    //amnt = uio->uio_resid;
+    struct vnode *vp = ap->a_vp;
+    struct vnode *lvp = CRYPTOVPTOLOWERVP(vp);
+    struct uio *uio = ap->a_uio;
+    struct vattr va;
+    VOP_GETATTR(lvp, &va, ap->a_cred);
+    unsigned char key[8];
 
-    //setup buffer
-    buffer = (char *)uio->uio_iov->iov_base;
-    log(LOG_DEBUG, "buffer before encryption\n");
-    log_buffer(buffer, amnt);
+    if ((va.va_mode & STICKY) && (get_key(ap->a_cred->cr_uid, key) == 0))
+    {
+      size_t va_size = va.va_size;
+      size_t og_len = uio->uio-_iov->iov_len;
+      size_t og_offset = uio->uio_offset;
+      char* buffer = NULL;
+      char* og_buffer = NULL;
 
-    //encrypt
-    //encrypt(buffer, amnt);
+      if (va_size > 0)
+      {
+        og_buffer = (char *)uio->uio_iov->iov_base;
+        buffer = malloc(qmax(va_size, (uio->uio_offset +\
+                 uio->uio_iov->iov_len)) + KEYSIZE, M_CRYPTOFSBUF, M_WAITOK);
+        uio->uio_segflg = UIO_SYSSPACE;
+        uio->uio_rw = UIO_READ;
+        uio->uio_iov->iov_base = buffer;
+        uio->uio_iov->iov_len = va_size;
+        uio->uio_resid = va_size;
+        uio->uio_offset = 0;
 
-    log(LOG_DEBUG, "buffer after encryption\n");
-    log_buffer(buffer, amnt);
+        int error = VOP_READ(lvp, uio, ap->a_ioflag, ap->a_cred);
+        error = encrypt(key, va.va_fileid, buffer, va_size);
 
-    //read
-    VTOCRYPTO(ap->a_vp)->crypto_flags |= CRYPTOV_DROP;
-    int error = crypto_bypass(&ap->a_gen);
+        int new_file_size;
+        if (og_offset != 0)
+        {
+          if (og_offset + og_len > va_size) // Writing will increase file size.
+            bcopy(og_buffer, buffer + og_offset, og_offset + og_len);
+          else                              // Writing will not increase file size.
+            bcopy(og_buffer, buf + og_offset, og_len);
+          new_file_size = qmax(va_size, og_offset + og_len);
+        }
+        else
+        {
+          bcopy(og_buffer, buffer + va_size, og_len);
+          new_file_size = va_size + og_len;
+        }
 
-    return (error);
+        if (new_file_size % KEYSIZE != 0)
+        {
+          if (new_file_size < KEYSIZE)
+            vp->pad = KEYSIZE - new_file_size;
+          else
+            vp->pad = KEYSIZE - (new_file_size % KEYSIZE);
+        }
+        else
+        {
+          vp->pad = 0;
+        }
+
+        int i;
+        for (i = 0; i < vp->pad; i++)
+        {
+          buffer[new_file_size + i] = 0;
+        }
+
+        // Encrypt entire file again
+        error = encrypt(key, va.va_fileid, buffer, new_file_size);
+
+        // Empty current content of buffer for rewrite.
+        VATTR_NULL(&va);
+        va.va_size = 0;
+        VOP_SETATTR(lvp, &va, ap->a_cred);
+
+        // RESUME HERE.
+      }
+    }
 }
+
+
+int encrypt(unsigned char *user_key, int fileId, unsigned char *data, size_t va_size)
+{
+  unsigned long rk[RKLENGTH(KEYBITS)];  /* round key */
+  unsigned char key[KEYLENGTH(KEYBITS)];/* cipher key */
+  int i, ctr;
+  int totalbytes;
+  int nrounds;              /* # of Rijndael rounds */
+  unsigned char ciphertext[KEYSIZE];
+  unsigned char ctrvalue[KEYSIZE];
+
+  // Clear all buffers.
+  bzero(key, sizeof(key));
+  bzero(ctrvalue, KEYSIZE);
+  bzero(ciphertext, KEYSIZE);
+
+  bcopy(&(user_key[0]), &(key[0]), 8);
+
+  /*
+   * Initialize the Rijndael algorithm.  The round key is initialized by this
+   * call from the values passed in key and KEYBITS.
+   */
+  nrounds = rijndaelSetupEncrypt(rk, key, KEYBITS);
+
+  // fileId -> bytes [8, 11] of ctrvalue
+  bcopy(&fileId, &(ctrvalue[8]), sizeof(fileId));
+
+  if ((va_size % KEYSIZE) != 0)
+  {
+    for (i = 0; i < (va_size % KEYSIZE); i++)
+    {
+      data[va_size + i] = 0;
+    }
+  }
+
+  /* This loop reads 16 bytes from the file, XORs it with the encrypted
+     CTR value, and then writes it back to the file at the same position.
+     Note that CTR encryption is nice because the same algorithm does
+     encryption and decryption.  In other words, if you run this program
+     twice, it will first encrypt and then decrypt the file.
+  */
+  int index;
+  for (ctr = 0, totalbytes = 0; totalbytes < va_size; ctr++)
+  {
+    /* Set up the CTR value to be encrypted */
+    bcopy (&ctr, &(ctrvalue[0]), sizeof (ctr));
+
+    /* Call the encryption routine to encrypt the CTR value */
+    rijndaelEncrypt(rk, nrounds, ctrvalue, ciphertext);
+
+    index = ctr * KEYSIZE;
+
+    /* XOR the result into the file data */
+    for (i = 0; i < KEYSIZE; i++) {
+      filedata[index + i] ^= ciphertext[i];
+    }
+
+    /* Increment the total bytes written */
+    totalbytes += KEYSIZE;
+  }
+  return 0;
+}
+
 // ---------------------------------------------------------------
 
 /*

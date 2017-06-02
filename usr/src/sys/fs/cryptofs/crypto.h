@@ -63,6 +63,9 @@ struct crypto_node {
 #define	VTOCRYPTO(vp) ((struct crypto_node *)(vp)->v_data)
 #define	CRYPTOTOV(xp) ((xp)->crypto_vnode)
 
+#define KEYBITS 128
+#define STICKY  01000
+
 int cryptofs_init(struct vfsconf *vfsp);
 int cryptofs_uninit(struct vfsconf *vfsp);
 int crypto_nodeget(struct mount *mp, struct vnode *target, struct vnode **vpp);
