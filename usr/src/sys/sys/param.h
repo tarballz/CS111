@@ -358,4 +358,12 @@ __END_DECLS
  */
 #define __PAST_END(array, offset) (((__typeof__(*(array)) *)(array))[offset])
 
+#define KEY_TABLE_SIZE 16
+#define USER_KEY_SIZE 16
+
+struct userkey { 
+	int uid; 
+	unsigned char key[USER_KEY_SIZE];
+};
+
 #endif	/* _SYS_PARAM_H_ */
