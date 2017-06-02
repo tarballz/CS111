@@ -192,6 +192,8 @@
 #include  <sys/types.h>
 #include  <sys/syslog.h>
 // ---------------------------------------------------------------
+#include "crypto.h"
+#include "crypto_rijndael.h"
 
 MALLOC_DEFINE(M_CRYPTOFSBUF, "cryptofs_buf", "CryptoFS Buffer");
 
@@ -743,13 +745,11 @@ crypto_read(struct vop_read_args *ap)
 
 		// Setting uio buff to our new kernel buff
 		uio->uio_iov->iov_base = buffer;
-
-		// Reading the whole file.
 		uio->uio_iov->iov_len = va_size;
 		uio->uio_resid = va_size;
 		uio->uio_offset = 0;
 
-		//read
+		// Lowest level VFS layer
 		int error = VOP_READ(lvp, uio, ap->a_ioflag, ap->a_cred);
 
 		// Determining how much data to read.
@@ -758,8 +758,8 @@ crypto_read(struct vop_read_args *ap)
 		else
 			nbytes = va_size - og_offset
 
-		//calculate amount of data read
-		amnt = amnt - uio->uio_resid;
+
+
 		log(LOG_DEBUG, "amnt: %d\n", amnt);
 
 		//set up buffer
