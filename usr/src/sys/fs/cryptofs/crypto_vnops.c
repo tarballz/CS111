@@ -686,11 +686,12 @@ log_buffer (char* buffer, int amnt) {
 	log(LOG_DEBUG, "\n");
 }
 
+//a dummy encryption function
 //encrypt()
 //input  : buffer of size BUFSIZE
 //effect : encrypts bytes in buffer
 static void
-encrypt (char* buffer, int amnt) {
+encrypt (char* buffer, int amnt, int k0, int k1) {
 	for(int i = 0; i < amnt; i++) {
 		if(buffer[i] != '\n')
 			buffer[i] = ~buffer[i];
@@ -700,6 +701,22 @@ encrypt (char* buffer, int amnt) {
 static int
 crypto_read(struct vop_read_args *ap)
 {
+
+    //Get sticky bit -----------------------
+	//TO BE IMPLEMENTED
+	int sticky_bit = 1;
+	//encryption occurs when sticky_bit = 1;
+	//--------------------------------------
+
+	//Get keys -----------------------------
+	//TO BE IMPLEMENTED
+
+	int k0 = 1;
+	int k1 = 1;
+
+	//--------------------------------------
+
+
 	char* buffer;
     static int amnt = 0;
 	
@@ -716,16 +733,11 @@ crypto_read(struct vop_read_args *ap)
 
 	//calculate amount of data read
 	amnt = amnt - uio->uio_resid;
-	log(LOG_DEBUG, "amnt: %d\n", amnt);
 
-	//set up buffer
-	log(LOG_DEBUG, "buffer before encryption\n");
-	log_buffer(buffer, amnt);
-
-	//encrypt
-    encrypt(buffer, amnt);
-    log(LOG_DEBUG, "buffer after encryption\n");
-	log_buffer(buffer, amnt);	
+	//encrypt if sticky bit is on
+    if(sticky_bit) {
+		encrypt(buffer, amnt, k0, k1);
+	}
 
 	return (error);
 }
@@ -733,6 +745,22 @@ crypto_read(struct vop_read_args *ap)
 static int
 crypto_write(struct vop_write_args *ap)
 {
+
+	//Get sticky bit -----------------------
+	//TO BE IMPLEMENTED
+	int sticky_bit = 1;
+	//encryption occurs when sticky_bit = 1;
+	//--------------------------------------
+
+	//Get keys -----------------------------
+	//TO BE IMPLEMENTED
+
+	int k0 = 1;
+	int k1 = 1;
+
+	//--------------------------------------
+
+
 	char* buffer;
     static int amnt = 0;
 	
@@ -742,14 +770,11 @@ crypto_write(struct vop_write_args *ap)
 
 	//setup buffer
 	buffer = (char *)uio->uio_iov->iov_base;
-	log(LOG_DEBUG, "buffer before encryption\n");
-	log_buffer(buffer, amnt);
 
-	//encrypt
-    encrypt(buffer, amnt);
-
-    log(LOG_DEBUG, "buffer after encryption\n");
-	log_buffer(buffer, amnt);
+    //encrypt if sticky bit is on
+    if(sticky_bit) {
+		encrypt(buffer, amnt, k0, k1);
+	}
 
 	//read
 	VTOCRYPTO(ap->a_vp)->crypto_flags |= CRYPTOV_DROP;
