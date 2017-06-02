@@ -5,6 +5,19 @@
 **/cryptofs/*@*
 **/#*#
 **/cryptofs/export_syms
+<<<<<<< HEAD
+<<<<<<< HEAD
 **/cryptofs/*.ko.*
 **/cryptofs/machine
 **/cryptofs/x86
+
+=======
+**/cryptofs/*.ko*
+**/cryptofs/machine
+**/cryptofs/x86
+>>>>>>> origin/asgn4-kfir
+=======
+**/cryptofs/*.ko.*
+**/cryptofs/machine
+**/cryptofs/x86
+>>>>>>> origin/asgn4-payton
