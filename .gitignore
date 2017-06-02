@@ -5,6 +5,6 @@
 **/cryptofs/*@*
 **/#*#
 **/cryptofs/export_syms
-**/cryptofs/*.ko*
+**/cryptofs/*.ko.*
 **/cryptofs/machine
 **/cryptofs/x86
