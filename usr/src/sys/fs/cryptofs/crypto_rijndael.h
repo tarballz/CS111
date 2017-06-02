@@ -13,7 +13,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 
-int AESencrypt(unsigned char *ukey, int fileId, unsigned char *data, size_t dsize);
+int encrypt(unsigned char *ukey, int fileId, unsigned char *data, size_t dsize);
 int rijndaelSetupEncrypt(unsigned long *rk, const unsigned char *key,
   int keybits);
 int rijndaelSetupDecrypt(unsigned long *rk, const unsigned char *key,
@@ -26,6 +26,7 @@ void rijndaelDecrypt(const unsigned long *rk, int nrounds,
 #define KEYLENGTH(keybits) ((keybits)/8)
 #define RKLENGTH(keybits)  ((keybits)/8+28)
 #define NROUNDS(keybits)   ((keybits)/32+6)
+#define KEYSIZE 16
 
 #endif
 

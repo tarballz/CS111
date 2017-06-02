@@ -1,6 +1,6 @@
 /*-
  * Copyright (c) 1992, 1993
- *	The Regents of the University of California.  All rights reserved.
+ *  The Regents of the University of California.  All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * John Heidemann of the UCLA Ficus project.
@@ -29,12 +29,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)crypto_vnops.c	8.6 (Berkeley) 5/27/95
+ *  @(#)crypto_vnops.c  8.6 (Berkeley) 5/27/95
  *
  * Ancestors:
- *	@(#)lofs_vnops.c	1.2 (Berkeley) 6/18/92
- *	...and...
- *	@(#)crypto_vnodeops.c 1.20 92/07/07 UCLA Ficus project
+ *  @(#)lofs_vnops.c    1.2 (Berkeley) 6/18/92
+ *  ...and...
+ *  @(#)crypto_vnodeops.c 1.20 92/07/07 UCLA Ficus project
  *
  * $FreeBSD: releng/10.3/sys/fs/cryptofs/crypto_vnops.c 295970 2016-02-24 13:48:40Z kib $
  */
@@ -199,7 +199,7 @@ MALLOC_DEFINE(M_CRYPTOFSBUF, "cryptofs_buf", "CryptoFS Buffer");
 
 static int crypto_bug_bypass = 0;   /* for debugging: enables bypass printf'ing */
 SYSCTL_INT(_debug, OID_AUTO, cryptofs_bug_bypass, CTLFLAG_RW, 
-	&crypto_bug_bypass, 0, "");
+    &crypto_bug_bypass, 0, "");
 
 /*
  * This is the 10-Apr-92 bypass routine.
@@ -228,134 +228,134 @@ SYSCTL_INT(_debug, OID_AUTO, cryptofs_bug_bypass, CTLFLAG_RW,
 int
 crypto_bypass(struct vop_generic_args *ap)
 {
-	struct vnode **this_vp_p;
-	int error;
-	struct vnode *old_vps[VDESC_MAX_VPS];
-	struct vnode **vps_p[VDESC_MAX_VPS];
-	struct vnode ***vppp;
-	struct vnodeop_desc *descp = ap->a_desc;
-	int reles, i;
+    struct vnode **this_vp_p;
+    int error;
+    struct vnode *old_vps[VDESC_MAX_VPS];
+    struct vnode **vps_p[VDESC_MAX_VPS];
+    struct vnode ***vppp;
+    struct vnodeop_desc *descp = ap->a_desc;
+    int reles, i;
 
-	if (crypto_bug_bypass)
-		printf ("crypto_bypass: %s\n", descp->vdesc_name);
+    if (crypto_bug_bypass)
+        printf ("crypto_bypass: %s\n", descp->vdesc_name);
 
 #ifdef DIAGNOSTIC
-	/*
-	 * We require at least one vp.
-	 */
-	if (descp->vdesc_vp_offsets == NULL ||
-	    descp->vdesc_vp_offsets[0] == VDESC_NO_OFFSET)
-		panic ("crypto_bypass: no vp's in map");
+    /*
+     * We require at least one vp.
+     */
+    if (descp->vdesc_vp_offsets == NULL ||
+        descp->vdesc_vp_offsets[0] == VDESC_NO_OFFSET)
+        panic ("crypto_bypass: no vp's in map");
 #endif
 
-	/*
-	 * Map the vnodes going in.
-	 * Later, we'll invoke the operation based on
-	 * the first mapped vnode's operation vector.
-	 */
-	reles = descp->vdesc_flags;
-	for (i = 0; i < VDESC_MAX_VPS; reles >>= 1, i++) {
-		if (descp->vdesc_vp_offsets[i] == VDESC_NO_OFFSET)
-			break;   /* bail out at end of list */
-		vps_p[i] = this_vp_p =
-			VOPARG_OFFSETTO(struct vnode**,descp->vdesc_vp_offsets[i],ap);
-		/*
-		 * We're not guaranteed that any but the first vnode
-		 * are of our type.  Check for and don't map any
-		 * that aren't.  (We must always map first vp or vclean fails.)
-		 */
-		if (i && (*this_vp_p == CRYPTOVP ||
-		    (*this_vp_p)->v_op != &crypto_vnodeops)) {
-			old_vps[i] = CRYPTOVP;
-		} else {
-			old_vps[i] = *this_vp_p;
-			*(vps_p[i]) = CRYPTOVPTOLOWERVP(*this_vp_p);
-			/*
-			 * XXX - Several operations have the side effect
-			 * of vrele'ing their vp's.  We must account for
-			 * that.  (This should go away in the future.)
-			 */
-			if (reles & VDESC_VP0_WILLRELE)
-				VREF(*this_vp_p);
-		}
+    /*
+     * Map the vnodes going in.
+     * Later, we'll invoke the operation based on
+     * the first mapped vnode's operation vector.
+     */
+    reles = descp->vdesc_flags;
+    for (i = 0; i < VDESC_MAX_VPS; reles >>= 1, i++) {
+        if (descp->vdesc_vp_offsets[i] == VDESC_NO_OFFSET)
+            break;   /* bail out at end of list */
+        vps_p[i] = this_vp_p =
+            VOPARG_OFFSETTO(struct vnode**,descp->vdesc_vp_offsets[i],ap);
+        /*
+         * We're not guaranteed that any but the first vnode
+         * are of our type.  Check for and don't map any
+         * that aren't.  (We must always map first vp or vclean fails.)
+         */
+        if (i && (*this_vp_p == CRYPTOVP ||
+            (*this_vp_p)->v_op != &crypto_vnodeops)) {
+            old_vps[i] = CRYPTOVP;
+        } else {
+            old_vps[i] = *this_vp_p;
+            *(vps_p[i]) = CRYPTOVPTOLOWERVP(*this_vp_p);
+            /*
+             * XXX - Several operations have the side effect
+             * of vrele'ing their vp's.  We must account for
+             * that.  (This should go away in the future.)
+             */
+            if (reles & VDESC_VP0_WILLRELE)
+                VREF(*this_vp_p);
+        }
 
-	}
+    }
 
-	/*
-	 * Call the operation on the lower layer
-	 * with the modified argument structure.
-	 */
-	if (vps_p[0] && *vps_p[0])
-		error = VCALL(ap);
-	else {
-		printf("crypto_bypass: no map for %s\n", descp->vdesc_name);
-		error = EINVAL;
-	}
+    /*
+     * Call the operation on the lower layer
+     * with the modified argument structure.
+     */
+    if (vps_p[0] && *vps_p[0])
+        error = VCALL(ap);
+    else {
+        printf("crypto_bypass: no map for %s\n", descp->vdesc_name);
+        error = EINVAL;
+    }
 
-	/*
-	 * Maintain the illusion of call-by-value
-	 * by restoring vnodes in the argument structure
-	 * to their original value.
-	 */
-	reles = descp->vdesc_flags;
-	for (i = 0; i < VDESC_MAX_VPS; reles >>= 1, i++) {
-		if (descp->vdesc_vp_offsets[i] == VDESC_NO_OFFSET)
-			break;   /* bail out at end of list */
-		if (old_vps[i]) {
-			*(vps_p[i]) = old_vps[i];
+    /*
+     * Maintain the illusion of call-by-value
+     * by restoring vnodes in the argument structure
+     * to their original value.
+     */
+    reles = descp->vdesc_flags;
+    for (i = 0; i < VDESC_MAX_VPS; reles >>= 1, i++) {
+        if (descp->vdesc_vp_offsets[i] == VDESC_NO_OFFSET)
+            break;   /* bail out at end of list */
+        if (old_vps[i]) {
+            *(vps_p[i]) = old_vps[i];
 #if 0
-			if (reles & VDESC_VP0_WILLUNLOCK)
-				VOP_UNLOCK(*(vps_p[i]), 0);
+            if (reles & VDESC_VP0_WILLUNLOCK)
+                VOP_UNLOCK(*(vps_p[i]), 0);
 #endif
-			if (reles & VDESC_VP0_WILLRELE)
-				vrele(*(vps_p[i]));
-		}
-	}
+            if (reles & VDESC_VP0_WILLRELE)
+                vrele(*(vps_p[i]));
+        }
+    }
 
-	/*
-	 * Map the possible out-going vpp
-	 * (Assumes that the lower layer always returns
-	 * a VREF'ed vpp unless it gets an error.)
-	 */
-	if (descp->vdesc_vpp_offset != VDESC_NO_OFFSET &&
-	    !(descp->vdesc_flags & VDESC_NOMAP_VPP) &&
-	    !error) {
-		/*
-		 * XXX - even though some ops have vpp returned vp's,
-		 * several ops actually vrele this before returning.
-		 * We must avoid these ops.
-		 * (This should go away when these ops are regularized.)
-		 */
-		if (descp->vdesc_flags & VDESC_VPP_WILLRELE)
-			goto out;
-		vppp = VOPARG_OFFSETTO(struct vnode***,
-				 descp->vdesc_vpp_offset,ap);
-		if (*vppp)
-			error = crypto_nodeget(old_vps[0]->v_mount, **vppp, *vppp);
-	}
+    /*
+     * Map the possible out-going vpp
+     * (Assumes that the lower layer always returns
+     * a VREF'ed vpp unless it gets an error.)
+     */
+    if (descp->vdesc_vpp_offset != VDESC_NO_OFFSET &&
+        !(descp->vdesc_flags & VDESC_NOMAP_VPP) &&
+        !error) {
+        /*
+         * XXX - even though some ops have vpp returned vp's,
+         * several ops actually vrele this before returning.
+         * We must avoid these ops.
+         * (This should go away when these ops are regularized.)
+         */
+        if (descp->vdesc_flags & VDESC_VPP_WILLRELE)
+            goto out;
+        vppp = VOPARG_OFFSETTO(struct vnode***,
+                 descp->vdesc_vpp_offset,ap);
+        if (*vppp)
+            error = crypto_nodeget(old_vps[0]->v_mount, **vppp, *vppp);
+    }
 
  out:
-	return (error);
+    return (error);
 }
 
 static int
 crypto_add_writecount(struct vop_add_writecount_args *ap)
 {
-	struct vnode *lvp, *vp;
-	int error;
+    struct vnode *lvp, *vp;
+    int error;
 
-	vp = ap->a_vp;
-	lvp = CRYPTOVPTOLOWERVP(vp);
-	KASSERT(vp->v_writecount + ap->a_inc >= 0, ("wrong writecount inc"));
-	if (vp->v_writecount > 0 && vp->v_writecount + ap->a_inc == 0)
-		error = VOP_ADD_WRITECOUNT(lvp, -1);
-	else if (vp->v_writecount == 0 && vp->v_writecount + ap->a_inc > 0)
-		error = VOP_ADD_WRITECOUNT(lvp, 1);
-	else
-		error = 0;
-	if (error == 0)
-		vp->v_writecount += ap->a_inc;
-	return (error);
+    vp = ap->a_vp;
+    lvp = CRYPTOVPTOLOWERVP(vp);
+    KASSERT(vp->v_writecount + ap->a_inc >= 0, ("wrong writecount inc"));
+    if (vp->v_writecount > 0 && vp->v_writecount + ap->a_inc == 0)
+        error = VOP_ADD_WRITECOUNT(lvp, -1);
+    else if (vp->v_writecount == 0 && vp->v_writecount + ap->a_inc > 0)
+        error = VOP_ADD_WRITECOUNT(lvp, 1);
+    else
+        error = 0;
+    if (error == 0)
+        vp->v_writecount += ap->a_inc;
+    return (error);
 }
 
 /*
@@ -366,93 +366,93 @@ crypto_add_writecount(struct vop_add_writecount_args *ap)
 static int
 crypto_lookup(struct vop_lookup_args *ap)
 {
-	struct componentname *cnp = ap->a_cnp;
-	struct vnode *dvp = ap->a_dvp;
-	int flags = cnp->cn_flags;
-	struct vnode *vp, *ldvp, *lvp;
-	struct mount *mp;
-	int error;
+    struct componentname *cnp = ap->a_cnp;
+    struct vnode *dvp = ap->a_dvp;
+    int flags = cnp->cn_flags;
+    struct vnode *vp, *ldvp, *lvp;
+    struct mount *mp;
+    int error;
 
-	mp = dvp->v_mount;
-	if ((flags & ISLASTCN) != 0 && (mp->mnt_flag & MNT_RDONLY) != 0 &&
-	    (cnp->cn_nameiop == DELETE || cnp->cn_nameiop == RENAME))
-		return (EROFS);
-	/*
-	 * Although it is possible to call crypto_bypass(), we'll do
-	 * a direct call to reduce overhead
-	 */
-	ldvp = CRYPTOVPTOLOWERVP(dvp);
-	vp = lvp = NULL;
-	KASSERT((ldvp->v_vflag & VV_ROOT) == 0 ||
-	    ((dvp->v_vflag & VV_ROOT) != 0 && (flags & ISDOTDOT) == 0),
-	    ("ldvp %p fl %#x dvp %p fl %#x flags %#x", ldvp, ldvp->v_vflag,
-	     dvp, dvp->v_vflag, flags));
+    mp = dvp->v_mount;
+    if ((flags & ISLASTCN) != 0 && (mp->mnt_flag & MNT_RDONLY) != 0 &&
+        (cnp->cn_nameiop == DELETE || cnp->cn_nameiop == RENAME))
+        return (EROFS);
+    /*
+     * Although it is possible to call crypto_bypass(), we'll do
+     * a direct call to reduce overhead
+     */
+    ldvp = CRYPTOVPTOLOWERVP(dvp);
+    vp = lvp = NULL;
+    KASSERT((ldvp->v_vflag & VV_ROOT) == 0 ||
+        ((dvp->v_vflag & VV_ROOT) != 0 && (flags & ISDOTDOT) == 0),
+        ("ldvp %p fl %#x dvp %p fl %#x flags %#x", ldvp, ldvp->v_vflag,
+         dvp, dvp->v_vflag, flags));
 
-	/*
-	 * Hold ldvp.  The reference on it, owned by dvp, is lost in
-	 * case of dvp reclamation, and we need ldvp to move our lock
-	 * from ldvp to dvp.
-	 */
-	vhold(ldvp);
+    /*
+     * Hold ldvp.  The reference on it, owned by dvp, is lost in
+     * case of dvp reclamation, and we need ldvp to move our lock
+     * from ldvp to dvp.
+     */
+    vhold(ldvp);
 
-	error = VOP_LOOKUP(ldvp, &lvp, cnp);
+    error = VOP_LOOKUP(ldvp, &lvp, cnp);
 
-	/*
-	 * VOP_LOOKUP() on lower vnode may unlock ldvp, which allows
-	 * dvp to be reclaimed due to shared v_vnlock.  Check for the
-	 * doomed state and return error.
-	 */
-	if ((error == 0 || error == EJUSTRETURN) &&
-	    (dvp->v_iflag & VI_DOOMED) != 0) {
-		error = ENOENT;
-		if (lvp != NULL)
-			vput(lvp);
+    /*
+     * VOP_LOOKUP() on lower vnode may unlock ldvp, which allows
+     * dvp to be reclaimed due to shared v_vnlock.  Check for the
+     * doomed state and return error.
+     */
+    if ((error == 0 || error == EJUSTRETURN) &&
+        (dvp->v_iflag & VI_DOOMED) != 0) {
+        error = ENOENT;
+        if (lvp != NULL)
+            vput(lvp);
 
-		/*
-		 * If vgone() did reclaimed dvp before curthread
-		 * relocked ldvp, the locks of dvp and ldpv are no
-		 * longer shared.  In this case, relock of ldvp in
-		 * lower fs VOP_LOOKUP() does not restore the locking
-		 * state of dvp.  Compensate for this by unlocking
-		 * ldvp and locking dvp, which is also correct if the
-		 * locks are still shared.
-		 */
-		VOP_UNLOCK(ldvp, 0);
-		vn_lock(dvp, LK_EXCLUSIVE | LK_RETRY);
-	}
-	vdrop(ldvp);
+        /*
+         * If vgone() did reclaimed dvp before curthread
+         * relocked ldvp, the locks of dvp and ldpv are no
+         * longer shared.  In this case, relock of ldvp in
+         * lower fs VOP_LOOKUP() does not restore the locking
+         * state of dvp.  Compensate for this by unlocking
+         * ldvp and locking dvp, which is also correct if the
+         * locks are still shared.
+         */
+        VOP_UNLOCK(ldvp, 0);
+        vn_lock(dvp, LK_EXCLUSIVE | LK_RETRY);
+    }
+    vdrop(ldvp);
 
-	if (error == EJUSTRETURN && (flags & ISLASTCN) != 0 &&
-	    (mp->mnt_flag & MNT_RDONLY) != 0 &&
-	    (cnp->cn_nameiop == CREATE || cnp->cn_nameiop == RENAME))
-		error = EROFS;
+    if (error == EJUSTRETURN && (flags & ISLASTCN) != 0 &&
+        (mp->mnt_flag & MNT_RDONLY) != 0 &&
+        (cnp->cn_nameiop == CREATE || cnp->cn_nameiop == RENAME))
+        error = EROFS;
 
-	if ((error == 0 || error == EJUSTRETURN) && lvp != NULL) {
-		if (ldvp == lvp) {
-			*ap->a_vpp = dvp;
-			VREF(dvp);
-			vrele(lvp);
-		} else {
-			error = crypto_nodeget(mp, lvp, &vp);
-			if (error == 0)
-				*ap->a_vpp = vp;
-		}
-	}
-	return (error);
+    if ((error == 0 || error == EJUSTRETURN) && lvp != NULL) {
+        if (ldvp == lvp) {
+            *ap->a_vpp = dvp;
+            VREF(dvp);
+            vrele(lvp);
+        } else {
+            error = crypto_nodeget(mp, lvp, &vp);
+            if (error == 0)
+                *ap->a_vpp = vp;
+        }
+    }
+    return (error);
 }
 
 static int
 crypto_open(struct vop_open_args *ap)
 {
-	int retval;
-	struct vnode *vp, *ldvp;
+    int retval;
+    struct vnode *vp, *ldvp;
 
-	vp = ap->a_vp;
-	ldvp = CRYPTOVPTOLOWERVP(vp);
-	retval = crypto_bypass(&ap->a_gen);
-	if (retval == 0)
-		vp->v_object = ldvp->v_object;
-	return (retval);
+    vp = ap->a_vp;
+    ldvp = CRYPTOVPTOLOWERVP(vp);
+    retval = crypto_bypass(&ap->a_gen);
+    if (retval == 0)
+        vp->v_object = ldvp->v_object;
+    return (retval);
 }
 
 /*
@@ -461,38 +461,38 @@ crypto_open(struct vop_open_args *ap)
 static int
 crypto_setattr(struct vop_setattr_args *ap)
 {
-	struct vnode *vp = ap->a_vp;
-	struct vattr *vap = ap->a_vap;
+    struct vnode *vp = ap->a_vp;
+    struct vattr *vap = ap->a_vap;
 
-  	if ((vap->va_flags != VNOVAL || vap->va_uid != (uid_t)VNOVAL ||
-	    vap->va_gid != (gid_t)VNOVAL || vap->va_atime.tv_sec != VNOVAL ||
-	    vap->va_mtime.tv_sec != VNOVAL || vap->va_mode != (mode_t)VNOVAL) &&
-	    (vp->v_mount->mnt_flag & MNT_RDONLY))
-		return (EROFS);
-	if (vap->va_size != VNOVAL) {
- 		switch (vp->v_type) {
- 		case VDIR:
- 			return (EISDIR);
- 		case VCHR:
- 		case VBLK:
- 		case VSOCK:
- 		case VFIFO:
-			if (vap->va_flags != VNOVAL)
-				return (EOPNOTSUPP);
-			return (0);
-		case VREG:
-		case VLNK:
- 		default:
-			/*
-			 * Disallow write attempts if the filesystem is
-			 * mounted read-only.
-			 */
-			if (vp->v_mount->mnt_flag & MNT_RDONLY)
-				return (EROFS);
-		}
-	}
+    if ((vap->va_flags != VNOVAL || vap->va_uid != (uid_t)VNOVAL ||
+        vap->va_gid != (gid_t)VNOVAL || vap->va_atime.tv_sec != VNOVAL ||
+        vap->va_mtime.tv_sec != VNOVAL || vap->va_mode != (mode_t)VNOVAL) &&
+        (vp->v_mount->mnt_flag & MNT_RDONLY))
+        return (EROFS);
+    if (vap->va_size != VNOVAL) {
+        switch (vp->v_type) {
+        case VDIR:
+            return (EISDIR);
+        case VCHR:
+        case VBLK:
+        case VSOCK:
+        case VFIFO:
+            if (vap->va_flags != VNOVAL)
+                return (EOPNOTSUPP);
+            return (0);
+        case VREG:
+        case VLNK:
+        default:
+            /*
+             * Disallow write attempts if the filesystem is
+             * mounted read-only.
+             */
+            if (vp->v_mount->mnt_flag & MNT_RDONLY)
+                return (EROFS);
+        }
+    }
 
-	return (crypto_bypass((struct vop_generic_args *)ap));
+    return (crypto_bypass((struct vop_generic_args *)ap));
 }
 
 /*
@@ -501,13 +501,13 @@ crypto_setattr(struct vop_setattr_args *ap)
 static int
 crypto_getattr(struct vop_getattr_args *ap)
 {
-	int error;
+    int error;
 
-	if ((error = crypto_bypass((struct vop_generic_args *)ap)) != 0)
-		return (error);
+    if ((error = crypto_bypass((struct vop_generic_args *)ap)) != 0)
+        return (error);
 
-	ap->a_vap->va_fsid = ap->a_vp->v_mount->mnt_stat.f_fsid.val[0];
-	return (0);
+    ap->a_vap->va_fsid = ap->a_vp->v_mount->mnt_stat.f_fsid.val[0];
+    return (0);
 }
 
 /*
@@ -516,53 +516,53 @@ crypto_getattr(struct vop_getattr_args *ap)
 static int
 crypto_access(struct vop_access_args *ap)
 {
-	struct vnode *vp = ap->a_vp;
-	accmode_t accmode = ap->a_accmode;
+    struct vnode *vp = ap->a_vp;
+    accmode_t accmode = ap->a_accmode;
 
-	/*
-	 * Disallow write attempts on read-only layers;
-	 * unless the file is a socket, fifo, or a block or
-	 * character device resident on the filesystem.
-	 */
-	if (accmode & VWRITE) {
-		switch (vp->v_type) {
-		case VDIR:
-		case VLNK:
-		case VREG:
-			if (vp->v_mount->mnt_flag & MNT_RDONLY)
-				return (EROFS);
-			break;
-		default:
-			break;
-		}
-	}
-	return (crypto_bypass((struct vop_generic_args *)ap));
+    /*
+     * Disallow write attempts on read-only layers;
+     * unless the file is a socket, fifo, or a block or
+     * character device resident on the filesystem.
+     */
+    if (accmode & VWRITE) {
+        switch (vp->v_type) {
+        case VDIR:
+        case VLNK:
+        case VREG:
+            if (vp->v_mount->mnt_flag & MNT_RDONLY)
+                return (EROFS);
+            break;
+        default:
+            break;
+        }
+    }
+    return (crypto_bypass((struct vop_generic_args *)ap));
 }
 
 static int
 crypto_accessx(struct vop_accessx_args *ap)
 {
-	struct vnode *vp = ap->a_vp;
-	accmode_t accmode = ap->a_accmode;
+    struct vnode *vp = ap->a_vp;
+    accmode_t accmode = ap->a_accmode;
 
-	/*
-	 * Disallow write attempts on read-only layers;
-	 * unless the file is a socket, fifo, or a block or
-	 * character device resident on the filesystem.
-	 */
-	if (accmode & VWRITE) {
-		switch (vp->v_type) {
-		case VDIR:
-		case VLNK:
-		case VREG:
-			if (vp->v_mount->mnt_flag & MNT_RDONLY)
-				return (EROFS);
-			break;
-		default:
-			break;
-		}
-	}
-	return (crypto_bypass((struct vop_generic_args *)ap));
+    /*
+     * Disallow write attempts on read-only layers;
+     * unless the file is a socket, fifo, or a block or
+     * character device resident on the filesystem.
+     */
+    if (accmode & VWRITE) {
+        switch (vp->v_type) {
+        case VDIR:
+        case VLNK:
+        case VREG:
+            if (vp->v_mount->mnt_flag & MNT_RDONLY)
+                return (EROFS);
+            break;
+        default:
+            break;
+        }
+    }
+    return (crypto_bypass((struct vop_generic_args *)ap));
 }
 
 /*
@@ -576,21 +576,21 @@ crypto_accessx(struct vop_accessx_args *ap)
 static int
 crypto_remove(struct vop_remove_args *ap)
 {
-	int retval, vreleit;
-	struct vnode *lvp, *vp;
+    int retval, vreleit;
+    struct vnode *lvp, *vp;
 
-	vp = ap->a_vp;
-	if (vrefcnt(vp) > 1) {
-		lvp = CRYPTOVPTOLOWERVP(vp);
-		VREF(lvp);
-		vreleit = 1;
-	} else
-		vreleit = 0;
-	VTOCRYPTO(vp)->crypto_flags |= CRYPTOV_DROP;
-	retval = crypto_bypass(&ap->a_gen);
-	if (vreleit != 0)
-		vrele(lvp);
-	return (retval);
+    vp = ap->a_vp;
+    if (vrefcnt(vp) > 1) {
+        lvp = CRYPTOVPTOLOWERVP(vp);
+        VREF(lvp);
+        vreleit = 1;
+    } else
+        vreleit = 0;
+    VTOCRYPTO(vp)->crypto_flags |= CRYPTOV_DROP;
+    retval = crypto_bypass(&ap->a_gen);
+    if (vreleit != 0)
+        vrele(lvp);
+    return (retval);
 }
 
 /*
@@ -601,39 +601,39 @@ crypto_remove(struct vop_remove_args *ap)
 static int
 crypto_rename(struct vop_rename_args *ap)
 {
-	struct vnode *tdvp = ap->a_tdvp;
-	struct vnode *fvp = ap->a_fvp;
-	struct vnode *fdvp = ap->a_fdvp;
-	struct vnode *tvp = ap->a_tvp;
-	struct crypto_node *tnn;
+    struct vnode *tdvp = ap->a_tdvp;
+    struct vnode *fvp = ap->a_fvp;
+    struct vnode *fdvp = ap->a_fdvp;
+    struct vnode *tvp = ap->a_tvp;
+    struct crypto_node *tnn;
 
-	/* Check for cross-device rename. */
-	if ((fvp->v_mount != tdvp->v_mount) ||
-	    (tvp && (fvp->v_mount != tvp->v_mount))) {
-		if (tdvp == tvp)
-			vrele(tdvp);
-		else
-			vput(tdvp);
-		if (tvp)
-			vput(tvp);
-		vrele(fdvp);
-		vrele(fvp);
-		return (EXDEV);
-	}
+    /* Check for cross-device rename. */
+    if ((fvp->v_mount != tdvp->v_mount) ||
+        (tvp && (fvp->v_mount != tvp->v_mount))) {
+        if (tdvp == tvp)
+            vrele(tdvp);
+        else
+            vput(tdvp);
+        if (tvp)
+            vput(tvp);
+        vrele(fdvp);
+        vrele(fvp);
+        return (EXDEV);
+    }
 
-	if (tvp != NULL) {
-		tnn = VTOCRYPTO(tvp);
-		tnn->crypto_flags |= CRYPTOV_DROP;
-	}
-	return (crypto_bypass((struct vop_generic_args *)ap));
+    if (tvp != NULL) {
+        tnn = VTOCRYPTO(tvp);
+        tnn->crypto_flags |= CRYPTOV_DROP;
+    }
+    return (crypto_bypass((struct vop_generic_args *)ap));
 }
 
 static int
 crypto_rmdir(struct vop_rmdir_args *ap)
 {
 
-	VTOCRYPTO(ap->a_vp)->crypto_flags |= CRYPTOV_DROP;
-	return (crypto_bypass(&ap->a_gen));
+    VTOCRYPTO(ap->a_vp)->crypto_flags |= CRYPTOV_DROP;
+    return (crypto_bypass(&ap->a_gen));
 }
 
 // Asgn4 code - kdolev -------------------------------------------
@@ -642,33 +642,33 @@ crypto_rmdir(struct vop_rmdir_args *ap)
 
 static void
 log_uio(struct uio *uio) {
-	struct iovec *iov;
-	char *iov_base;
-	iov = uio->uio_iov;
-	iov_base = iov->iov_base;
-	char* segflag;
-	char* rw;
-	switch (uio->uio_segflg) {
-		case UIO_USERSPACE:
-			segflag = "UIO_USERSPACE";
-			break;
+    struct iovec *iov;
+    char *iov_base;
+    iov = uio->uio_iov;
+    iov_base = iov->iov_base;
+    char* segflag;
+    char* rw;
+    switch (uio->uio_segflg) {
+        case UIO_USERSPACE:
+            segflag = "UIO_USERSPACE";
+            break;
 
-		case UIO_SYSSPACE:
-			segflag = "UIO_SYSSPACE";
-			break;
-		case UIO_NOCOPY:
-			segflag = "UIO_NOCOPY";
-			break;
-	}
-	switch (uio->uio_rw) {
-		case UIO_READ:
-			rw = "UIO_READ";
-			break;
+        case UIO_SYSSPACE:
+            segflag = "UIO_SYSSPACE";
+            break;
+        case UIO_NOCOPY:
+            segflag = "UIO_NOCOPY";
+            break;
+    }
+    switch (uio->uio_rw) {
+        case UIO_READ:
+            rw = "UIO_READ";
+            break;
 
-		case UIO_WRITE:
-			rw = "UIO_WRITE";
-			break;
-	}
+        case UIO_WRITE:
+            rw = "UIO_WRITE";
+            break;
+    }
     log(LOG_DEBUG, "UIO Data------------------------\n" );
     log(LOG_DEBUG, "iov_base %p\n"    , iov_base);
     log(LOG_DEBUG, "iov_length %zd\n" , iov->iov_len);
@@ -678,134 +678,264 @@ log_uio(struct uio *uio) {
     log(LOG_DEBUG, "uio_segflag %s\n" , segflag);
     log(LOG_DEBUG, "uio_rw %s\n"      , rw);
     log(LOG_DEBUG, "--------------------------------\n" );
-	return;
+    return;
 }
 
 static void
 log_buffer (char* buffer, int amnt) {
-	for(int i = 0; i < amnt; i++) {
-		log(LOG_DEBUG, "%c",buffer[i]);
-	}
-	log(LOG_DEBUG, "\n");
+    for(int i = 0; i < amnt; i++) {
+        log(LOG_DEBUG, "%c",buffer[i]);
+    }
+    log(LOG_DEBUG, "\n");
 }
 
+#if 0
 //encrypt()
 //input  : buffer of size BUFSIZE
 //effect : encrypts bytes in buffer
 static void
 encrypt (char* buffer, int amnt) {
-	for(int i = 0; i < amnt; i++) {
-		if(buffer[i] != '\n')
-			buffer[i] = ~buffer[i];
-	}
+    for(int i = 0; i < amnt; i++) {
+        if(buffer[i] != '\n')
+            buffer[i] = ~buffer[i];
+    }
 }
+#endif
 
 static int
 crypto_read(struct vop_read_args *ap)
 {
-	struct vnode *vp = ap->a_vp;
-	struct vnode *lvp = CRYPTOVPTOLOWERVP(vp);
-	//struct uio *uio = ap->a_uio;
-	struct vattr va;
-	VOP_GETATTR(lvp, &va, ap->a_cred);
-	size_t va_size = va.va_size;
-	char* buffer = NULL;
-	char* og_buffer = NULL;
+    struct vnode *vp = ap->a_vp;
+    struct vnode *lvp = CRYPTOVPTOLOWERVP(vp);
+    struct uio *uio = ap->a_uio;
+    // vnode attributes.
+    struct vattr va;
+    VOP_GETATTR(lvp, &va, ap->a_cred);
+    size_t file_size = va.va_size;
+    char* buffer = NULL;
+    char* og_buffer = NULL;
     static int amnt = 0;
+    unsigned char key[8];
 
     if (vp->v_type != VREG)
-    	return (EOPNOTSUPP);
+      return (EOPNOTSUPP);
     if (uio->uio_resid == 0)
-    	return 0;
-    if (va_size <= uio->uio_offset)
-    	return 0;
-	
-	//set up vars
-	struct uio* uio = ap->a_uio;
-	amnt = uio->uio_resid;
+      return -1;
+    if (file_size <= uio->uio_offset)
+      return -1;
 
-	if (va.va_mode & STICKY)
-	{
-		// Preserving original values.
-		size_t og_len = uio->uio_iov->iov_len;
-		size_t og_offset = uio->uio_offset;
-		size_t nbytes;
+    if ((va.va_mode & STICKY) && (get_key(ap->a_cred->cr_uid, key) == 0))
+    {
+      // Preserving original values.
+      size_t og_len = uio->uio_iov->iov_len;
+      size_t og_offset = uio->uio_offset;
+      size_t nbytes;
 
-		//setup buffer
-		og_buffer = (char *)uio->uio_iov->iov_base;
+      //setup buffer
+      og_buffer = (char *)uio->uio_iov->iov_base;
 
-		// Malloc'ing 16 extra bytes to pad out to blocksize.
-		buffer = malloc(va_size + 16, M_CRYPTOFSBUF, M_WAITOK);
+      // Malloc'ing 16 extra bytes to pad out to blocksize.
+      buffer = malloc(file_size + KEYSIZE, M_CRYPTOFSBUF, M_WAITOK);
 
-		/*
-		 * Setting uio flag to kernel-space so we can get data from
-         * the read() into a kernel buff for decryption.
-		 */
-		uio->uio_segflg = UIO_SYSSPACE;
+      /*
+       * Setting uio flag to kernel-space so we can get data from
+       * the read() into a kernel buff for decryption.
+       */
+      uio->uio_segflg = UIO_SYSSPACE;
 
-		// Setting uio buff to our new kernel buff
-		uio->uio_iov->iov_base = buffer;
-		uio->uio_iov->iov_len = va_size;
-		uio->uio_resid = va_size;
-		uio->uio_offset = 0;
+      // Setting uio buff to our new kernel buff
+      uio->uio_iov->iov_base = buffer;
+      uio->uio_iov->iov_len = file_size;
+      uio->uio_resid = file_size;
+      uio->uio_offset = 0;
 
-		// Lowest level VFS layer
-		int error = VOP_READ(lvp, uio, ap->a_ioflag, ap->a_cred);
+      // Lowest level VFS layer
+      int error = VOP_READ(lvp, uio, ap->a_ioflag, ap->a_cred);
 
-		// Determining how much data to read.
-		if (og_len < va_size && (va_size - og_offset) > og_len)
-			nbytes = og_len;
-		else
-			nbytes = va_size - og_offset
+      // Determining how much data to read.
+      if (og_len < file_size && (file_size - og_offset) > og_len)
+        nbytes = og_len;
+      else
+        nbytes = file_size - og_offset;
 
+      //set up buffer
+      log(LOG_DEBUG, "buffer before encryption\n");
+      log_buffer(buffer, amnt);
 
+      error = encrypt(key, va.va_fileid, buffer, file_size);
+      copyout(buffer + og_offset, og_buffer, nbytes);
 
-		log(LOG_DEBUG, "amnt: %d\n", amnt);
+      log(LOG_DEBUG, "buffer after encryption\n");
+      log_buffer(buffer, amnt);   
 
-		//set up buffer
-		log(LOG_DEBUG, "buffer before encryption\n");
-		log_buffer(buffer, amnt);
+      // Restore default attribs.
+      uio->uio_iov->iov_base = og_buffer + nbytes;
+      uio->uio_segflg = UIO_USERSPACE;
+      if (og_len < file_size)
+      {
+        uio->uio_iov->iov_len = 0;
+        uio->uio_resid = 0;
+      }
+      else
+      {
+        uio->uio_iov->iov_len = (og_len - nbytes);
+        uio->uio_resid = (og_len - nbytes);
+      }
+      uio->uio_offset = og_offset + nbytes;
 
-		//encrypt
-	    encrypt(buffer, amnt);
-	    log(LOG_DEBUG, "buffer after encryption\n");
-		log_buffer(buffer, amnt);	
-
-		return (error);
-	}
-	else
-	{
-		return VOP_READ(lvp, uio, ap->a_ioflag, ap->a_cred);
-	}
+      free(buffer, M_CRYPTOFSBUF);
+      return (error);
+    }
+    else
+    {
+      return VOP_READ(lvp, uio, ap->a_ioflag, ap->a_cred);
+    }
 }
 
 static int
 crypto_write(struct vop_write_args *ap)
 {
-	char* buffer;
-    static int amnt = 0;
-	
-	//set up vars
-	struct uio* uio = ap->a_uio;
-	amnt = uio->uio_resid;
+    struct vnode *vp = ap->a_vp;
+    struct vnode *lvp = CRYPTOVPTOLOWERVP(vp);
+    struct uio *uio = ap->a_uio;
+    struct vattr va;
+    VOP_GETATTR(lvp, &va, ap->a_cred);
+    unsigned char key[8];
 
-	//setup buffer
-	buffer = (char *)uio->uio_iov->iov_base;
-	log(LOG_DEBUG, "buffer before encryption\n");
-	log_buffer(buffer, amnt);
+    if ((va.va_mode & STICKY) && (get_key(ap->a_cred->cr_uid, key) == 0))
+    {
+      size_t file_size = va.va_size;
+      size_t og_len = uio->uio-_iov->iov_len;
+      size_t og_offset = uio->uio_offset;
+      char* buffer = NULL;
+      char* og_buffer = NULL;
 
-	//encrypt
-    encrypt(buffer, amnt);
+      if (file_size > 0)
+      {
+        og_buffer = (char *)uio->uio_iov->iov_base;
+        buffer = malloc(qmax(file_size, (uio->uio_offset +\
+                 uio->uio_iov->iov_len)) + KEYSIZE, M_CRYPTOFSBUF, M_WAITOK);
+        uio->uio_segflg = UIO_SYSSPACE;
+        uio->uio_rw = UIO_READ;
+        uio->uio_iov->iov_base = buffer;
+        uio->uio_iov->iov_len = file_size;
+        uio->uio_resid = file_size;
+        uio->uio_offset = 0;
 
-    log(LOG_DEBUG, "buffer after encryption\n");
-	log_buffer(buffer, amnt);
+        // Calling lower level VFS layer.
+        int error = VOP_READ(lvp, uio, ap->a_ioflag, ap->a_cred);
+        error = encrypt(key, va.va_fileid, buffer, file_size);
 
-	//read
-	VTOCRYPTO(ap->a_vp)->crypto_flags |= CRYPTOV_DROP;
-	int error = crypto_bypass(&ap->a_gen);
+        int new_file_size;
+        if (og_offset != 0)
+        {
+          if (og_offset + og_len > file_size) // Writing will increase file size.
+            bcopy(og_buffer, buffer + og_offset, og_offset + og_len);
+          else                              // Writing will not increase file size.
+            bcopy(og_buffer, buf + og_offset, og_len);
+          new_file_size = qmax(file_size, og_offset + og_len);
+        }
+        else
+        {
+          bcopy(og_buffer, buffer + file_size, og_len);
+          new_file_size = file_size + og_len;
+        }
 
-	return (error);
+        // Need to pad block-size.
+        if (new_file_size % KEYSIZE != 0)
+        {
+          if (new_file_size < KEYSIZE)  // split
+            vp->pad = KEYSIZE - new_file_size;
+          else                          // append
+            vp->pad = KEYSIZE - (new_file_size % KEYSIZE);
+        }
+        else
+        {
+          vp->pad = 0;
+        }
+
+        int i;
+        for (i = 0; i < vp->pad; i++)
+        {
+          buffer[new_file_size + i] = 0;
+        }
+
+        // Encrypt entire file again
+        error = encrypt(key, va.va_fileid, buffer, new_file_size);
+
+        // Empty current content of buffer for rewrite.
+        VATTR_NULL(&va);
+        va.va_size = 0;
+        VOP_SETATTR(lvp, &va, ap->a_cred);
+
+        // RESUME HERE.
+      }
+    }
 }
+
+
+int encrypt(unsigned char *user_key, int fileId, unsigned char *data, size_t va_size)
+{
+  unsigned long rk[RKLENGTH(KEYBITS)];  /* round key */
+  unsigned char key[KEYLENGTH(KEYBITS)];/* cipher key */
+  int i, ctr;
+  int totalbytes;
+  int nrounds;              /* # of Rijndael rounds */
+  unsigned char ciphertext[KEYSIZE];
+  unsigned char ctrvalue[KEYSIZE];
+
+  // Clear all buffers.
+  bzero(key, sizeof(key));
+  bzero(ctrvalue, KEYSIZE);
+  bzero(ciphertext, KEYSIZE);
+
+  bcopy(&(user_key[0]), &(key[0]), 8);
+
+  /*
+   * Initialize the Rijndael algorithm.  The round key is initialized by this
+   * call from the values passed in key and KEYBITS.
+   */
+  nrounds = rijndaelSetupEncrypt(rk, key, KEYBITS);
+
+  // fileId -> bytes [8, 11] of ctrvalue
+  bcopy(&fileId, &(ctrvalue[8]), sizeof(fileId));
+
+  if ((va_size % KEYSIZE) != 0)
+  {
+    for (i = 0; i < (va_size % KEYSIZE); i++)
+    {
+      data[va_size + i] = 0;
+    }
+  }
+
+  /* This loop reads 16 bytes from the file, XORs it with the encrypted
+     CTR value, and then writes it back to the file at the same position.
+     Note that CTR encryption is nice because the same algorithm does
+     encryption and decryption.  In other words, if you run this program
+     twice, it will first encrypt and then decrypt the file.
+  */
+  int index;
+  for (ctr = 0, totalbytes = 0; totalbytes < va_size; ctr++)
+  {
+    /* Set up the CTR value to be encrypted */
+    bcopy (&ctr, &(ctrvalue[0]), sizeof (ctr));
+
+    /* Call the encryption routine to encrypt the CTR value */
+    rijndaelEncrypt(rk, nrounds, ctrvalue, ciphertext);
+
+    index = ctr * KEYSIZE;
+
+    /* XOR the result into the file data */
+    for (i = 0; i < KEYSIZE; i++) {
+      filedata[index + i] ^= ciphertext[i];
+    }
+
+    /* Increment the total bytes written */
+    totalbytes += KEYSIZE;
+  }
+  return 0;
+}
+
 // ---------------------------------------------------------------
 
 /*
@@ -816,68 +946,68 @@ crypto_write(struct vop_write_args *ap)
 static int
 crypto_lock(struct vop_lock1_args *ap)
 {
-	struct vnode *vp = ap->a_vp;
-	int flags = ap->a_flags;
-	struct crypto_node *nn;
-	struct vnode *lvp;
-	int error;
+    struct vnode *vp = ap->a_vp;
+    int flags = ap->a_flags;
+    struct crypto_node *nn;
+    struct vnode *lvp;
+    int error;
 
 
-	if ((flags & LK_INTERLOCK) == 0) {
-		VI_LOCK(vp);
-		ap->a_flags = flags |= LK_INTERLOCK;
-	}
-	nn = VTOCRYPTO(vp);
-	/*
-	 * If we're still active we must ask the lower layer to
-	 * lock as ffs has special lock considerations in it's
-	 * vop lock.
-	 */
-	if (nn != NULL && (lvp = CRYPTOVPTOLOWERVP(vp)) != NULL) {
-		VI_LOCK_FLAGS(lvp, MTX_DUPOK);
-		VI_UNLOCK(vp);
-		/*
-		 * We have to hold the vnode here to solve a potential
-		 * reclaim race.  If we're forcibly vgone'd while we
-		 * still have refs, a thread could be sleeping inside
-		 * the lowervp's vop_lock routine.  When we vgone we will
-		 * drop our last ref to the lowervp, which would allow it
-		 * to be reclaimed.  The lowervp could then be recycled,
-		 * in which case it is not legal to be sleeping in it's VOP.
-		 * We prevent it from being recycled by holding the vnode
-		 * here.
-		 */
-		vholdl(lvp);
-		error = VOP_LOCK(lvp, flags);
+    if ((flags & LK_INTERLOCK) == 0) {
+        VI_LOCK(vp);
+        ap->a_flags = flags |= LK_INTERLOCK;
+    }
+    nn = VTOCRYPTO(vp);
+    /*
+     * If we're still active we must ask the lower layer to
+     * lock as ffs has special lock considerations in it's
+     * vop lock.
+     */
+    if (nn != NULL && (lvp = CRYPTOVPTOLOWERVP(vp)) != NULL) {
+        VI_LOCK_FLAGS(lvp, MTX_DUPOK);
+        VI_UNLOCK(vp);
+        /*
+         * We have to hold the vnode here to solve a potential
+         * reclaim race.  If we're forcibly vgone'd while we
+         * still have refs, a thread could be sleeping inside
+         * the lowervp's vop_lock routine.  When we vgone we will
+         * drop our last ref to the lowervp, which would allow it
+         * to be reclaimed.  The lowervp could then be recycled,
+         * in which case it is not legal to be sleeping in it's VOP.
+         * We prevent it from being recycled by holding the vnode
+         * here.
+         */
+        vholdl(lvp);
+        error = VOP_LOCK(lvp, flags);
 
-		/*
-		 * We might have slept to get the lock and someone might have
-		 * clean our vnode already, switching vnode lock from one in
-		 * lowervp to v_lock in our own vnode structure.  Handle this
-		 * case by reacquiring correct lock in requested mode.
-		 */
-		if (VTOCRYPTO(vp) == NULL && error == 0) {
-			ap->a_flags &= ~(LK_TYPE_MASK | LK_INTERLOCK);
-			switch (flags & LK_TYPE_MASK) {
-			case LK_SHARED:
-				ap->a_flags |= LK_SHARED;
-				break;
-			case LK_UPGRADE:
-			case LK_EXCLUSIVE:
-				ap->a_flags |= LK_EXCLUSIVE;
-				break;
-			default:
-				panic("Unsupported lock request %d\n",
-				    ap->a_flags);
-			}
-			VOP_UNLOCK(lvp, 0);
-			error = vop_stdlock(ap);
-		}
-		vdrop(lvp);
-	} else
-		error = vop_stdlock(ap);
+        /*
+         * We might have slept to get the lock and someone might have
+         * clean our vnode already, switching vnode lock from one in
+         * lowervp to v_lock in our own vnode structure.  Handle this
+         * case by reacquiring correct lock in requested mode.
+         */
+        if (VTOCRYPTO(vp) == NULL && error == 0) {
+            ap->a_flags &= ~(LK_TYPE_MASK | LK_INTERLOCK);
+            switch (flags & LK_TYPE_MASK) {
+            case LK_SHARED:
+                ap->a_flags |= LK_SHARED;
+                break;
+            case LK_UPGRADE:
+            case LK_EXCLUSIVE:
+                ap->a_flags |= LK_EXCLUSIVE;
+                break;
+            default:
+                panic("Unsupported lock request %d\n",
+                    ap->a_flags);
+            }
+            VOP_UNLOCK(lvp, 0);
+            error = vop_stdlock(ap);
+        }
+        vdrop(lvp);
+    } else
+        error = vop_stdlock(ap);
 
-	return (error);
+    return (error);
 }
 
 /*
@@ -888,36 +1018,36 @@ crypto_lock(struct vop_lock1_args *ap)
 static int
 crypto_unlock(struct vop_unlock_args *ap)
 {
-	struct vnode *vp = ap->a_vp;
-	int flags = ap->a_flags;
-	int mtxlkflag = 0;
-	struct crypto_node *nn;
-	struct vnode *lvp;
-	int error;
+    struct vnode *vp = ap->a_vp;
+    int flags = ap->a_flags;
+    int mtxlkflag = 0;
+    struct crypto_node *nn;
+    struct vnode *lvp;
+    int error;
 
-	if ((flags & LK_INTERLOCK) != 0)
-		mtxlkflag = 1;
-	else if (mtx_owned(VI_MTX(vp)) == 0) {
-		VI_LOCK(vp);
-		mtxlkflag = 2;
-	}
-	nn = VTOCRYPTO(vp);
-	if (nn != NULL && (lvp = CRYPTOVPTOLOWERVP(vp)) != NULL) {
-		VI_LOCK_FLAGS(lvp, MTX_DUPOK);
-		flags |= LK_INTERLOCK;
-		vholdl(lvp);
-		VI_UNLOCK(vp);
-		error = VOP_UNLOCK(lvp, flags);
-		vdrop(lvp);
-		if (mtxlkflag == 0)
-			VI_LOCK(vp);
-	} else {
-		if (mtxlkflag == 2)
-			VI_UNLOCK(vp);
-		error = vop_stdunlock(ap);
-	}
+    if ((flags & LK_INTERLOCK) != 0)
+        mtxlkflag = 1;
+    else if (mtx_owned(VI_MTX(vp)) == 0) {
+        VI_LOCK(vp);
+        mtxlkflag = 2;
+    }
+    nn = VTOCRYPTO(vp);
+    if (nn != NULL && (lvp = CRYPTOVPTOLOWERVP(vp)) != NULL) {
+        VI_LOCK_FLAGS(lvp, MTX_DUPOK);
+        flags |= LK_INTERLOCK;
+        vholdl(lvp);
+        VI_UNLOCK(vp);
+        error = VOP_UNLOCK(lvp, flags);
+        vdrop(lvp);
+        if (mtxlkflag == 0)
+            VI_LOCK(vp);
+    } else {
+        if (mtxlkflag == 2)
+            VI_UNLOCK(vp);
+        error = vop_stdunlock(ap);
+    }
 
-	return (error);
+    return (error);
 }
 
 /*
@@ -928,29 +1058,29 @@ crypto_unlock(struct vop_unlock_args *ap)
 static int
 crypto_inactive(struct vop_inactive_args *ap __unused)
 {
-	struct vnode *vp, *lvp;
-	struct crypto_node *xp;
-	struct mount *mp;
-	struct crypto_mount *xmp;
+    struct vnode *vp, *lvp;
+    struct crypto_node *xp;
+    struct mount *mp;
+    struct crypto_mount *xmp;
 
-	vp = ap->a_vp;
-	xp = VTOCRYPTO(vp);
-	lvp = CRYPTOVPTOLOWERVP(vp);
-	mp = vp->v_mount;
-	xmp = MOUNTTOCRYPTOMOUNT(mp);
-	if ((xmp->cryptom_flags & CRYPTOM_CACHE) == 0 ||
-	    (xp->crypto_flags & CRYPTOV_DROP) != 0 ||
-	    (lvp->v_vflag & VV_NOSYNC) != 0) {
-		/*
-		 * If this is the last reference and caching of the
-		 * cryptofs vnodes is not enabled, or the lower vnode is
-		 * deleted, then free up the vnode so as not to tie up
-		 * the lower vnodes.
-		 */
-		vp->v_object = NULL;
-		vrecycle(vp);
-	}
-	return (0);
+    vp = ap->a_vp;
+    xp = VTOCRYPTO(vp);
+    lvp = CRYPTOVPTOLOWERVP(vp);
+    mp = vp->v_mount;
+    xmp = MOUNTTOCRYPTOMOUNT(mp);
+    if ((xmp->cryptom_flags & CRYPTOM_CACHE) == 0 ||
+        (xp->crypto_flags & CRYPTOV_DROP) != 0 ||
+        (lvp->v_vflag & VV_NOSYNC) != 0) {
+        /*
+         * If this is the last reference and caching of the
+         * cryptofs vnodes is not enabled, or the lower vnode is
+         * deleted, then free up the vnode so as not to tie up
+         * the lower vnodes.
+         */
+        vp->v_object = NULL;
+        vrecycle(vp);
+    }
+    return (0);
 }
 
 /*
@@ -960,162 +1090,162 @@ crypto_inactive(struct vop_inactive_args *ap __unused)
 static int
 crypto_reclaim(struct vop_reclaim_args *ap)
 {
-	struct vnode *vp;
-	struct crypto_node *xp;
-	struct vnode *lowervp;
+    struct vnode *vp;
+    struct crypto_node *xp;
+    struct vnode *lowervp;
 
-	vp = ap->a_vp;
-	xp = VTOCRYPTO(vp);
-	lowervp = xp->crypto_lowervp;
+    vp = ap->a_vp;
+    xp = VTOCRYPTO(vp);
+    lowervp = xp->crypto_lowervp;
 
-	KASSERT(lowervp != NULL && vp->v_vnlock != &vp->v_lock,
-	    ("Reclaiming incomplete crypto vnode %p", vp));
+    KASSERT(lowervp != NULL && vp->v_vnlock != &vp->v_lock,
+        ("Reclaiming incomplete crypto vnode %p", vp));
 
-	crypto_hashrem(xp);
-	/*
-	 * Use the interlock to protect the clearing of v_data to
-	 * prevent faults in crypto_lock().
-	 */
-	lockmgr(&vp->v_lock, LK_EXCLUSIVE, NULL);
-	VI_LOCK(vp);
-	vp->v_data = NULL;
-	vp->v_object = NULL;
-	vp->v_vnlock = &vp->v_lock;
-	VI_UNLOCK(vp);
+    crypto_hashrem(xp);
+    /*
+     * Use the interlock to protect the clearing of v_data to
+     * prevent faults in crypto_lock().
+     */
+    lockmgr(&vp->v_lock, LK_EXCLUSIVE, NULL);
+    VI_LOCK(vp);
+    vp->v_data = NULL;
+    vp->v_object = NULL;
+    vp->v_vnlock = &vp->v_lock;
+    VI_UNLOCK(vp);
 
-	/*
-	 * If we were opened for write, we leased one write reference
-	 * to the lower vnode.  If this is a reclamation due to the
-	 * forced unmount, undo the reference now.
-	 */
-	if (vp->v_writecount > 0)
-		VOP_ADD_WRITECOUNT(lowervp, -1);
-	if ((xp->crypto_flags & CRYPTOV_NOUNLOCK) != 0)
-		vunref(lowervp);
-	else
-		vput(lowervp);
-	free(xp, M_CRYPTOFSNODE);
+    /*
+     * If we were opened for write, we leased one write reference
+     * to the lower vnode.  If this is a reclamation due to the
+     * forced unmount, undo the reference now.
+     */
+    if (vp->v_writecount > 0)
+        VOP_ADD_WRITECOUNT(lowervp, -1);
+    if ((xp->crypto_flags & CRYPTOV_NOUNLOCK) != 0)
+        vunref(lowervp);
+    else
+        vput(lowervp);
+    free(xp, M_CRYPTOFSNODE);
 
-	return (0);
+    return (0);
 }
 
 static int
 crypto_print(struct vop_print_args *ap)
 {
-	struct vnode *vp = ap->a_vp;
+    struct vnode *vp = ap->a_vp;
 
-	printf("\tvp=%p, lowervp=%p\n", vp, VTOCRYPTO(vp)->crypto_lowervp);
-	return (0);
+    printf("\tvp=%p, lowervp=%p\n", vp, VTOCRYPTO(vp)->crypto_lowervp);
+    return (0);
 }
 
 /* ARGSUSED */
 static int
 crypto_getwritemount(struct vop_getwritemount_args *ap)
 {
-	struct crypto_node *xp;
-	struct vnode *lowervp;
-	struct vnode *vp;
+    struct crypto_node *xp;
+    struct vnode *lowervp;
+    struct vnode *vp;
 
-	vp = ap->a_vp;
-	VI_LOCK(vp);
-	xp = VTOCRYPTO(vp);
-	if (xp && (lowervp = xp->crypto_lowervp)) {
-		VI_LOCK_FLAGS(lowervp, MTX_DUPOK);
-		VI_UNLOCK(vp);
-		vholdl(lowervp);
-		VI_UNLOCK(lowervp);
-		VOP_GETWRITEMOUNT(lowervp, ap->a_mpp);
-		vdrop(lowervp);
-	} else {
-		VI_UNLOCK(vp);
-		*(ap->a_mpp) = NULL;
-	}
-	return (0);
+    vp = ap->a_vp;
+    VI_LOCK(vp);
+    xp = VTOCRYPTO(vp);
+    if (xp && (lowervp = xp->crypto_lowervp)) {
+        VI_LOCK_FLAGS(lowervp, MTX_DUPOK);
+        VI_UNLOCK(vp);
+        vholdl(lowervp);
+        VI_UNLOCK(lowervp);
+        VOP_GETWRITEMOUNT(lowervp, ap->a_mpp);
+        vdrop(lowervp);
+    } else {
+        VI_UNLOCK(vp);
+        *(ap->a_mpp) = NULL;
+    }
+    return (0);
 }
 
 static int
 crypto_vptofh(struct vop_vptofh_args *ap)
 {
-	struct vnode *lvp;
+    struct vnode *lvp;
 
-	lvp = CRYPTOVPTOLOWERVP(ap->a_vp);
-	return VOP_VPTOFH(lvp, ap->a_fhp);
+    lvp = CRYPTOVPTOLOWERVP(ap->a_vp);
+    return VOP_VPTOFH(lvp, ap->a_fhp);
 }
 
 static int
 crypto_vptocnp(struct vop_vptocnp_args *ap)
 {
-	struct vnode *vp = ap->a_vp;
-	struct vnode **dvp = ap->a_vpp;
-	struct vnode *lvp, *ldvp;
-	struct ucred *cred = ap->a_cred;
-	int error, locked;
+    struct vnode *vp = ap->a_vp;
+    struct vnode **dvp = ap->a_vpp;
+    struct vnode *lvp, *ldvp;
+    struct ucred *cred = ap->a_cred;
+    int error, locked;
 
-	if (vp->v_type == VDIR)
-		return (vop_stdvptocnp(ap));
+    if (vp->v_type == VDIR)
+        return (vop_stdvptocnp(ap));
 
-	locked = VOP_ISLOCKED(vp);
-	lvp = CRYPTOVPTOLOWERVP(vp);
-	vhold(lvp);
-	VOP_UNLOCK(vp, 0); /* vp is held by vn_vptocnp_locked that called us */
-	ldvp = lvp;
-	vref(lvp);
-	error = vn_vptocnp(&ldvp, cred, ap->a_buf, ap->a_buflen);
-	vdrop(lvp);
-	if (error != 0) {
-		vn_lock(vp, locked | LK_RETRY);
-		return (ENOENT);
-	}
+    locked = VOP_ISLOCKED(vp);
+    lvp = CRYPTOVPTOLOWERVP(vp);
+    vhold(lvp);
+    VOP_UNLOCK(vp, 0); /* vp is held by vn_vptocnp_locked that called us */
+    ldvp = lvp;
+    vref(lvp);
+    error = vn_vptocnp(&ldvp, cred, ap->a_buf, ap->a_buflen);
+    vdrop(lvp);
+    if (error != 0) {
+        vn_lock(vp, locked | LK_RETRY);
+        return (ENOENT);
+    }
 
-	/*
-	 * Exclusive lock is required by insmntque1 call in
-	 * crypto_nodeget()
-	 */
-	error = vn_lock(ldvp, LK_EXCLUSIVE);
-	if (error != 0) {
-		vrele(ldvp);
-		vn_lock(vp, locked | LK_RETRY);
-		return (ENOENT);
-	}
-	vref(ldvp);
-	error = crypto_nodeget(vp->v_mount, ldvp, dvp);
-	if (error == 0) {
+    /*
+     * Exclusive lock is required by insmntque1 call in
+     * crypto_nodeget()
+     */
+    error = vn_lock(ldvp, LK_EXCLUSIVE);
+    if (error != 0) {
+        vrele(ldvp);
+        vn_lock(vp, locked | LK_RETRY);
+        return (ENOENT);
+    }
+    vref(ldvp);
+    error = crypto_nodeget(vp->v_mount, ldvp, dvp);
+    if (error == 0) {
 #ifdef DIAGNOSTIC
-		CRYPTOVPTOLOWERVP(*dvp);
+        CRYPTOVPTOLOWERVP(*dvp);
 #endif
-		VOP_UNLOCK(*dvp, 0); /* keep reference on *dvp */
-	}
-	vn_lock(vp, locked | LK_RETRY);
-	return (error);
+        VOP_UNLOCK(*dvp, 0); /* keep reference on *dvp */
+    }
+    vn_lock(vp, locked | LK_RETRY);
+    return (error);
 }
 
 /*
  * Global vfs data structures
  */
 struct vop_vector crypto_vnodeops = {
-	.vop_bypass =		crypto_bypass,
-	.vop_access =		crypto_access,
-	.vop_accessx =		crypto_accessx,
-	.vop_advlockpurge =	vop_stdadvlockpurge,
-	.vop_bmap =		VOP_EOPNOTSUPP,
-	.vop_getattr =		crypto_getattr,
-	.vop_getwritemount =	crypto_getwritemount,
-	.vop_inactive =		crypto_inactive,
-	.vop_islocked =		vop_stdislocked,
-	.vop_lock1 =		crypto_lock,
-	.vop_lookup =		crypto_lookup,
-	.vop_open =		crypto_open,
-	.vop_print =		crypto_print,
-	.vop_reclaim =		crypto_reclaim,
-	.vop_remove =		crypto_remove,
-	.vop_rename =		crypto_rename,
-	.vop_rmdir =		crypto_rmdir,
-	.vop_setattr =		crypto_setattr,
-	.vop_strategy =		VOP_EOPNOTSUPP,
-	.vop_unlock =		crypto_unlock,
+    .vop_bypass =       crypto_bypass,
+    .vop_access =       crypto_access,
+    .vop_accessx =      crypto_accessx,
+    .vop_advlockpurge = vop_stdadvlockpurge,
+    .vop_bmap =     VOP_EOPNOTSUPP,
+    .vop_getattr =      crypto_getattr,
+    .vop_getwritemount =    crypto_getwritemount,
+    .vop_inactive =     crypto_inactive,
+    .vop_islocked =     vop_stdislocked,
+    .vop_lock1 =        crypto_lock,
+    .vop_lookup =       crypto_lookup,
+    .vop_open =     crypto_open,
+    .vop_print =        crypto_print,
+    .vop_reclaim =      crypto_reclaim,
+    .vop_remove =       crypto_remove,
+    .vop_rename =       crypto_rename,
+    .vop_rmdir =        crypto_rmdir,
+    .vop_setattr =      crypto_setattr,
+    .vop_strategy =     VOP_EOPNOTSUPP,
+    .vop_unlock =       crypto_unlock,
     .vop_read =         crypto_read,   //asgn4 code - kdolev
     .vop_write =        crypto_write,  //asgn4 code - kdolev
-	.vop_vptocnp =		crypto_vptocnp,
-	.vop_vptofh =		crypto_vptofh,
-	.vop_add_writecount =	crypto_add_writecount,
+    .vop_vptocnp =      crypto_vptocnp,
+    .vop_vptofh =       crypto_vptofh,
+    .vop_add_writecount =   crypto_add_writecount,
 };
