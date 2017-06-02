@@ -12,9 +12,8 @@
 
 #define KEYBITS 128
 #define STICKY  01000
-#define KEYSIZE 16
 
-int AESencrypt(unsigned char *user_key, int fileId, unsigned char *data, size_t va_size)
+int encrypt(unsigned char *user_key, int fileId, unsigned char *data, size_t va_size)
 {
   unsigned long rk[RKLENGTH(KEYBITS)];  /* round key */
   unsigned char key[KEYLENGTH(KEYBITS)];/* cipher key */
