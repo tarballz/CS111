@@ -17,117 +17,137 @@
 #include <strings.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include "rijndael.h"
 
 static char rcsid[] = "$Id: encrypt.c,v 1.2 2003/04/15 01:05:36 elm Exp elm $";
 
 #define KEYBITS 128
+#define STICKY  01000
 
-/***********************************************************************
- *
- * hexvalue
- *
- * This routine takes a single character as input, and returns the
- * hexadecimal equivalent.  If the character passed isn't a hex value,
- * the program exits.
- *
- ***********************************************************************
- */
-int hexvalue (char c)
+
+/* Used to grab the second half of the key if needed */
+int second_half (int keylen)
 {
-  if (c >= '0' && c <= '9') {
-    return (c - '0');
-  } else if (c >= 'a' && c <= 'f') {
-    return (10 + c - 'a');
-  } else if (c >= 'A' && c <= 'F') {
-    return (10 + c - 'A');
-  } else {
-    fprintf (stderr, "ERROR: key digit %c isn't a hex digit!\n", c);
-    exit (-1);
-  }
-}
-
-
-/***********************************************************************
- *
- * getpassword
- *
- * Get the key from the password.  The key is specified as a string of
- * hex digits, two per key byte.  password points at the character
- * currently being added to the key.  If it's '\0', the key is done.
- *
- ***********************************************************************
- */
-void
-getpassword (const char *password, unsigned char *key, int keylen)
-{
-  int		i;
-
-  for (i = 0; i < keylen; i++) {
-    if (*password == '\0') {
-      key[i] = 0;
-    } else {
-      /* Add the first of two digits to the current key value */
-      key[i] = hexvalue (*(password++)) << 4;
-      /* If there's a second digit at this position, add it */
-      if (*password != '\0') {
-	key[i] |= hexvalue (*(password++));
-      }
-    }
-  }
+  if (keylen < 8)
+    return keylen;
+  else
+    return 8;
 }
 
 int main(int argc, char **argv)
 {
-  unsigned long rk[RKLENGTH(KEYBITS)];	/* round key */
+  unsigned long rk[RKLENGTH(KEYBITS)];  /* round key */
   unsigned char key[KEYLENGTH(KEYBITS)];/* cipher key */
-  char	buf[100];
+  char  buf[100];
   int i, nbytes, nwritten , ctr;
   int totalbytes;
-  int	k0, k1;
-  int fileId = 0x1234;			/* fake (in this example) */
-  int nrounds;				/* # of Rijndael rounds */
-  char *password;			/* supplied (ASCII) password */
-  int	fd;
+  int k0, k1;
+  int fileId = 0x1234;      /* fake (in this example) */
+  int nrounds;        /* # of Rijndael rounds */
+  char *password;     /* supplied (ASCII) password */
+  int fd;
   char *filename;
   unsigned char filedata[16];
   unsigned char ciphertext[16];
   unsigned char ctrvalue[16];
 
+  char* usage = "Usage: ./protectfile <-e || --encrypt> || <-d || --decrypt> <key1> <key2> <file>\n";
+  //char* args;
+  int encrypt_set = 0;
+  int decrypt_set = 0;
+  struct stat file_stat;
 
-#if 0
-  if (argc < 3)
+  if (argc < 5)
   {
-    fprintf (stderr, "Usage: %s <key> <file>\n", argv[0]);
+    printf ("%s", usage);
     return 1;
   }
-  /*
-   * Get the key from the password.  The key is specified as a string of
-   * hex digits, two per key byte.  password points at the character
-   * currently being added to the key.  If it's '\0', the key is done.
-   */
-  getpassword (argv[1], key, sizeof (key));
-  filename = argv[2];
-#else
-  if (argc < 4)
+
+  // Checking args passed by user.
+  if (strcmp(argv[1], "-e") == 0 || strcmp(argv[1], "--encrypt"))
   {
-    fprintf (stderr, "Usage: %s <key1> <key2> <file>\n", argv[0]);
+    encrypt_set = 1;
+  }
+  else if (strcmp(argv[1], "-d") || strcmp(argv[1], "--decrypt"))
+  {
+    decrypt_set = 1;
+  }
+  else
+  {
+    printf ("Invalid arguments!\n");
+    printf ("%s", usage);
     return 1;
   }
+
+  // Need to strip off leading 0x if user provides key in hex form.
+  if (argv[2][0] == '0' && (argv[2][1] == 'x' || argv[2][2] == 'X'))
+  {
+    printf("it\'s hex.\n");
+    argv[2] += 2;
+  }
+  if (argv[3][0] == '0' && (argv[3][1] == 'x' || argv[3][2] == 'X'))
+  {
+    printf("it\'s hex.\n");
+    argv[2] += 2;
+  }
+
+  int key_length = strlen(argv[2]);
+
   bzero (key, sizeof (key));
-  k0 = strtol (argv[1], NULL, 0);
-  k1 = strtol (argv[2], NULL, 0);
+  bzero (ctrvalue, sizeof (ctrvalue));
+  // Need to get key into a hex value and strip off leading 0's.
+
+  // Removing a bunch of shit to make this accept 2 keys instead of 1.
+  #if 0
+    // Creating "0xdeadbeef" or whatever.
+    bcopy (argv[2], &buf[2], second_half(key_length));
+    printf ("%s\n", buf);
+    /*
+     * long num = strol ( str_with_nums_and_letters, char* ptr_string_portion, base)
+     * - So basically num gets set to the number thats in str_... and ptr_...
+     *   gets the string that's in str_...
+     * - If base == 0, then the string should have a 0x prefix, which will then
+     *   cause the number to be read in base-16.
+     */
+    k0 = strtol (buf, NULL, 0);
+    printf ("k0: %d\n", k0);
+    // Clearing buf.
+    bzero (buf, sizeof(buf));
+    // If need be, grab the remaining ints from the key, and make a new hex value.
+    if (key_length > 8)
+    {
+      strcpy (buf, "0x");
+      bcopy ((argv[2] + 8), &buf[2], key_length - 8);
+    }
+    k1 = strtol (buf, NULL, 0);
+    printf ("k1: %d\n", k1);
+
+    // Might want to delete this.  Check with Jake.
+    if (k0 == 0 && k1 == 0)
+    {
+      fprintf(stderr, "Encryption / Decryption disabled for this user.\n");
+      exit (-1);
+    }
+    
+    bzero (buf, sizeof(buf));
+  #else
+    k0 = strtol (argv[2], NULL, 0);
+    k1 = strtol (argv[3], NULL, 0);
+  #endif
+  // Replacing the leading 0's in key with our newly formatted k0.
   bcopy (&k0, &(key[0]), sizeof (k0));
   bcopy (&k1, &(key[sizeof(k0)]), sizeof (k1));
-  filename = argv[3];
-#endif
+  filename = argv[argc - 1];
 
   /* Print the key, just in case */
   for (i = 0; i < sizeof (key); i++) {
     sprintf (buf+2*i, "%02x", key[sizeof(key)-i-1]);
   }
   fprintf (stderr, "KEY: %s\n", buf);
-
+  
   /*
    * Initialize the Rijndael algorithm.  The round key is initialized by this
    * call from the values passed in key and KEYBITS.
@@ -140,10 +160,31 @@ int main(int argc, char **argv)
   fd = open(filename, O_RDWR);
   if (fd < 0)
   {
-    fprintf(stderr, "Error opening file %s\n", argv[2]);
+    fprintf(stderr, "Error opening file %s\n", argv[argc - 1]);
     return 1;
   }
 
+  // Opening the inode of fd.
+  if (fstat(fd, &file_stat) < 0)
+  {
+    fprintf (stderr, "Unable to get stats from file %s\n", argv[argc - 1]);
+    return 1;
+  }
+
+  // inode "number" of fd.
+  fileId = file_stat.st_ino;
+  // Testing
+  printf("%s inode num: %d\n", argv[argc - 1], fileId);
+
+  // fd permissions = protection_mode AND NOT(sticky)
+  // Unsetting sticky-bit.
+  if (fchmod(fd, file_stat.st_mode & ~(STICKY)))
+  {
+    printf("Cannot unset sticky bit!\n");
+    return 1;
+  }
+  
+  
   /* fileID goes into bytes 8-11 of the ctrvalue */
   bcopy (&fileId, &(ctrvalue[8]), sizeof (fileId));
 
@@ -166,6 +207,15 @@ int main(int argc, char **argv)
       exit (-1);
     }
 
+    // Padding with zeros so userspace matches kernelspace.
+    if (nbytes < 16)
+    {
+      for (int i = nbytes; i < 16; i++)
+      {
+        filedata[i] = 0;
+      }
+    }
+
     /* Set up the CTR value to be encrypted */
     bcopy (&ctr, &(ctrvalue[0]), sizeof (ctr));
 
@@ -182,13 +232,34 @@ int main(int argc, char **argv)
     if (nwritten != nbytes)
     {
       fprintf (stderr,
-	       "%s: error writing the file (expected %d, got %d at ctr %d\n)",
-	       argv[0], nbytes, nwritten, ctr);
+         "%s: error writing the file (expected %d, got %d at ctr %d\n)",
+         argv[0], nbytes, nwritten, ctr);
       break;
     }
 
     /* Increment the total bytes written */
     totalbytes += nbytes;
+  }
+
+  if (fstat(fd, &file_stat) < 0)
+  {
+    fprintf (stderr, "Unable to get stats from file %s\n", argv[argc - 1]);
+    return 1;
+  }
+
+  if (encrypt_set)
+  {
+    if (fchmod(fd, file_stat.st_mode | STICKY)){
+      // For some reason it works without sudo lol
+      //printf("chmod:  Error encrypting.  Are you using sudo?\n");
+    }
+  }
+  else if (decrypt_set)
+  {
+    if (fchmod(fd, file_stat.st_mode & ~(STICKY))){
+      // For some reason it works without sudo lol
+      //printf("chmod:  Error decrypting.  Are you using sudo?\n");
+    }
   }
   close (fd);
 }

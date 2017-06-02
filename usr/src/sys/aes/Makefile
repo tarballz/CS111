@@ -6,19 +6,18 @@
 
 SRCS = encrypt.c rijndael.c
 INCS = rijndael.h
-PROGS = protectfile
+PROGS = encrypt
 OTHERS = testfile Makefile
 DIR = $(notdir $(PWD))
 TAR = tar
 TARFILE = aes.tgz
-RM = rm
 
 COBJS = rijndael.o
 CFLAGS = -O3
 
 all: $(PROGS)
 
-protectfile: encrypt.o $(COBJS) $(INCS)
+encrypt: encrypt.o $(COBJS) $(INCS)
 	$(CC) $(CFLAGS) -o $@ encrypt.o $(COBJS)
 
 rijndael.o: rijndael.h
@@ -28,8 +27,8 @@ tarball:
 
 test: all
 	cp testfile testfile.orig~
-	./protectfile 0x1234 0x5678 testfile
-	./protectfile 0x1234 0x5678 testfile
+	./encrypt 0x1234 0x5678 testfile
+	./encrypt 0x1234 0x5678 testfile
 	diff testfile testfile.orig~
 
 clean:
