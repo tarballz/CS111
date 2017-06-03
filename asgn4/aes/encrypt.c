@@ -25,8 +25,10 @@
 static char rcsid[] = "$Id: encrypt.c,v 1.2 2003/04/15 01:05:36 elm Exp elm $";
 
 #define KEYBITS 128
-#define STICKY  01000
-
+// Universal check for sticky bit.
+// Prints 0 if sticky is not set.
+// Prints 512 (i.e., not zero) if sticky is set.
+#define CHECK_STICKY(var) ((var) & (1<<(9)))
 
 /* Used to grab the second half of the key if needed */
 int second_half (int keylen)
@@ -45,7 +47,7 @@ int main(int argc, char **argv)
   int i, nbytes, nwritten , ctr;
   int totalbytes;
   int k0, k1;
-  int fileId = 0x1234;      /* fake (in this example) */
+  int fileId, file_mode;
   int nrounds;        /* # of Rijndael rounds */
   char *password;     /* supplied (ASCII) password */
   int fd;
@@ -67,11 +69,11 @@ int main(int argc, char **argv)
   }
 
   // Checking args passed by user.
-  if (strcmp(argv[1], "-e") == 0 || strcmp(argv[1], "--encrypt"))
+  if (strcmp(argv[1], "-e") == 0 || strcmp(argv[1], "--encrypt") == 0)
   {
     encrypt_set = 1;
   }
-  else if (strcmp(argv[1], "-d") || strcmp(argv[1], "--decrypt"))
+  else if (strcmp(argv[1], "-d") == 0 || strcmp(argv[1], "--decrypt") == 0)
   {
     decrypt_set = 1;
   }
@@ -91,7 +93,7 @@ int main(int argc, char **argv)
   if (argv[3][0] == '0' && (argv[3][1] == 'x' || argv[3][2] == 'X'))
   {
     printf("it\'s hex.\n");
-    argv[2] += 2;
+    argv[3] += 2;
   }
 
   int key_length = strlen(argv[2]);
@@ -100,46 +102,14 @@ int main(int argc, char **argv)
   bzero (ctrvalue, sizeof (ctrvalue));
   // Need to get key into a hex value and strip off leading 0's.
 
-  // Removing a bunch of shit to make this accept 2 keys instead of 1.
-  #if 0
-    // Creating "0xdeadbeef" or whatever.
-    bcopy (argv[2], &buf[2], second_half(key_length));
-    printf ("%s\n", buf);
-    /*
-     * long num = strol ( str_with_nums_and_letters, char* ptr_string_portion, base)
-     * - So basically num gets set to the number thats in str_... and ptr_...
-     *   gets the string that's in str_...
-     * - If base == 0, then the string should have a 0x prefix, which will then
-     *   cause the number to be read in base-16.
-     */
-    k0 = strtol (buf, NULL, 0);
-    printf ("k0: %d\n", k0);
-    // Clearing buf.
-    bzero (buf, sizeof(buf));
-    // If need be, grab the remaining ints from the key, and make a new hex value.
-    if (key_length > 8)
-    {
-      strcpy (buf, "0x");
-      bcopy ((argv[2] + 8), &buf[2], key_length - 8);
-    }
-    k1 = strtol (buf, NULL, 0);
-    printf ("k1: %d\n", k1);
-
-    // Might want to delete this.  Check with Jake.
-    if (k0 == 0 && k1 == 0)
-    {
-      fprintf(stderr, "Encryption / Decryption disabled for this user.\n");
-      exit (-1);
-    }
-    
-    bzero (buf, sizeof(buf));
-  #else
-    k0 = strtol (argv[2], NULL, 0);
-    k1 = strtol (argv[3], NULL, 0);
-  #endif
+  k0 = strtol (argv[2], NULL, 0);
+  k1 = strtol (argv[3], NULL, 0);
   // Replacing the leading 0's in key with our newly formatted k0.
   bcopy (&k0, &(key[0]), sizeof (k0));
   bcopy (&k1, &(key[sizeof(k0)]), sizeof (k1));
+
+  // sys_setkey()
+  syscall(548, k0, k1);
   filename = argv[argc - 1];
 
   /* Print the key, just in case */
@@ -171,18 +141,32 @@ int main(int argc, char **argv)
     return 1;
   }
 
-  // inode "number" of fd.
-  fileId = file_stat.st_ino;
-  // Testing
-  printf("%s inode num: %d\n", argv[argc - 1], fileId);
+  // inode "mode" of fd, using for the check for STICKY.
+  file_mode = file_stat.st_mode;
+
+  // Checks for if the user is trying to decrypt a decrypted file.
+  //printf("Sticky value: %d\n", CHECK_STICKY(file_mode));
+  if (CHECK_STICKY(file_mode) == 0 && (strcmp(argv[1], "-d") == 0 || strcmp(argv[1], "--decrypt")))
+  {
+    printf("Trying to decrypt a decrypted file!\n");
+    exit(-1);
+  }
+  // Checks for if the user is trying to encrypt a encrypted file.
+  if (CHECK_STICKY(file_mode) != 0 && (strcmp(argv[1], "-e") == 0 || strcmp(argv[1], "--encrypt")))
+  {
+    printf("Trying to encrypt an encrypted file!\n");
+    exit(-1);
+  }
 
   // fd permissions = protection_mode AND NOT(sticky)
   // Unsetting sticky-bit.
-  if (fchmod(fd, file_stat.st_mode & ~(STICKY)))
+  if (fchmod(fd, file_stat.st_mode & ~(S_ISVTX)) == -1)
   {
     printf("Cannot unset sticky bit!\n");
     return 1;
   }
+
+  printf("Trying to decrypt: %d\n", (file_stat.st_mode & ~(S_ISVTX)));
   
   
   /* fileID goes into bytes 8-11 of the ctrvalue */
@@ -249,14 +233,16 @@ int main(int argc, char **argv)
 
   if (encrypt_set)
   {
-    if (fchmod(fd, file_stat.st_mode | STICKY)){
+    printf("Encrypt: %d\n", fchmod(fd, file_stat.st_mode | S_ISVTX));
+    if (fchmod(fd, file_stat.st_mode | S_ISVTX)){
       // For some reason it works without sudo lol
       //printf("chmod:  Error encrypting.  Are you using sudo?\n");
     }
   }
   else if (decrypt_set)
   {
-    if (fchmod(fd, file_stat.st_mode & ~(STICKY))){
+    printf("Decrypt: %d\n", fchmod(fd, file_stat.st_mode & ~(S_ISVTX)));
+    if (fchmod(fd, file_stat.st_mode & ~(S_ISVTX))){
       // For some reason it works without sudo lol
       //printf("chmod:  Error decrypting.  Are you using sudo?\n");
     }

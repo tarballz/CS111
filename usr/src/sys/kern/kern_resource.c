@@ -104,20 +104,20 @@ sys_setkey(td, uap)
 {
 	int index = -1;
 	for (int i=0; i<=last_entry; i++) {
-		// printf("key_table[%d].uid:%d", i, key_table[i].uid);
+		printf("key_table[%d].uid:%d", i, key_table[i].uid);
 		if (key_table[i].uid == td->td_ucred->cr_uid) {
 			index = i;
-			// printf(" ->\tFOUND!");
+			printf(" ->\tFOUND!");
 		}
-		// printf("\n");
+		printf("\n");
 	}
 	if ((last_entry == (KEY_TABLE_SIZE-1)) && (index < 0)) {
-		// printf("Table full!\n");
+		printf("Table full!\n");
 		return (0); //error, already 16 user/key pairs
 					//(if there are 16 entries and cur user wasn't found)
 	}
 	if (index < 0) {
-		// printf("New entry added!\n");
+		printf("New entry added!\n");
 		last_entry++;
 		index = last_entry;
 		key_table[index].uid = td->td_ucred->cr_uid;
@@ -129,9 +129,9 @@ sys_setkey(td, uap)
 	bcopy(&(uap->k1), &(new_key[USER_KEY_SIZE/2]), USER_KEY_SIZE/2);
 	bcopy(&(new_key[0]), &(key_table[index].key[0]), USER_KEY_SIZE);
 	
-  	// for (int i = 0; i < sizeof (new_key); i++)
-   //  	printf("%02x", new_key[sizeof(new_key)-i-1]);
-  	// printf("\n");
+  	for (int i = 0; i < sizeof (new_key); i++)
+    	printf("%02x", new_key[sizeof(new_key)-i-1]);
+  	printf("\n");
 
 	return (0);
 }
@@ -141,7 +141,7 @@ get_key(int uid, unsigned char *k)
 {
 	for(int i=0; i<=last_entry; i++) {
 		if (key_table[i].uid == uid) {
-			bcopy(&(key_table[i].key[0]), &(k[0]), USER_KEY_SIZE);
+			bcopy(&(key_table[i].key[0]), &(k[0]), 8);
 			return 0;
 		}
 	}

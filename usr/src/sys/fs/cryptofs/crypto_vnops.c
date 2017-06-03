@@ -661,14 +661,6 @@ encrypt(unsigned char *user_key, int fileId, unsigned char *data, size_t va_size
   // fileId -> bytes [8, 11] of ctrvalue
   bcopy(&fileId, &(ctrvalue[8]), sizeof(fileId));
 
-  if ((va_size % KEYSIZE) != 0)
-  {
-    for (i = 0; i < (va_size % KEYSIZE); i++)
-    {
-      data[va_size + i] = 0;
-    }
-  }
-
   /* This loop reads 16 bytes from the file, XORs it with the encrypted
      CTR value, and then writes it back to the file at the same position.
      Note that CTR encryption is nice because the same algorithm does
@@ -792,7 +784,7 @@ crypto_read(struct vop_read_args *ap)
   //calculate amount of data read
   amnt = amnt - uio->uio_resid;
 
-  //encrypt if sticky bit is on
+  // encrypt if sticky bit is on
   //if (sticky_bit) {
   if (sticky_bit && get_key(ap->a_cred->cr_uid, key) == 0) {
     encrypt(key, va.va_fileid, buffer, file_size);

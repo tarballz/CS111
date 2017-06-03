@@ -44,6 +44,11 @@
 #define BSD4_3	1
 #define BSD4_4	1
 
+// Universal check for sticky bit.
+// Prints 0 if sticky is not set.
+// Prints 512 (i.e., not zero) if sticky is set.
+#define CHECK_STICKY(var) ((var) & (1<<(9)))
+
 /* 
  * __FreeBSD_version numbers are documented in the Porter's Handbook.
  * If you bump the version for any reason, you should update the documentation
