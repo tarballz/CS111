@@ -182,6 +182,7 @@
 #include <sys/vnode.h>
 
 #include <fs/cryptofs/crypto.h>
+#include <fs/cryptofs/crypto_rijndael.h>
 
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
@@ -190,7 +191,6 @@
 
 #include <sys/syslog.h>
 
-#include "crypto_rijndael.h"
 
 MALLOC_DEFINE(M_CRYPTOFSBUF, "cryptofs_buf", "CryptoFS Buffer");
 
