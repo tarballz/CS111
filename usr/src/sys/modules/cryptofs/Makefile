@@ -4,6 +4,6 @@
 
 KMOD=	cryptofs
 SRCS=	vnode_if.h \
-	crypto_subr.c crypto_vfsops.c crypto_vnops.c
+	crypto_subr.c crypto_vfsops.c crypto_vnops.c crypto_rijndael.c
 
 .include <bsd.kmod.mk>
