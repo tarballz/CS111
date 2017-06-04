@@ -57,6 +57,8 @@ int
 vaccess_acl_posix1e(enum vtype type, uid_t file_uid, gid_t file_gid,
     struct acl *acl, accmode_t accmode, struct ucred *cred, int *privused)
 {
+
+	log(7, "############ vaccess_acl_posix1e ########\n\n");
 	struct acl_entry *acl_other, *acl_mask;
 	accmode_t dac_granted;
 	accmode_t priv_granted;

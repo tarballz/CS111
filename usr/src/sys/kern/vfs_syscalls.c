@@ -66,6 +66,7 @@ __FBSDID("$FreeBSD: releng/10.3/sys/kern/vfs_syscalls.c 293474 2016-01-09 14:20:
 #include <sys/stat.h>
 #include <sys/sx.h>
 #include <sys/unistd.h>
+#include <sys/ucred.h> // added [bmccoid] --> usage @ setfmode() line 2770
 #include <sys/vnode.h>
 #include <sys/priv.h>
 #include <sys/proc.h>
@@ -1133,9 +1134,14 @@ kern_openat(struct thread *td, int fd, char *path, enum uio_seg pathseg,
 	 * An extra reference on `fp' has been held for us by
 	 * falloc_noinstall().
 	 */
-	/* Set the flags early so the finit in devfs can pick them up. */
+	/* Set the flags early so the finit in devfs can pick them up. 
+	 * 
+	 * [bmccoid]: Possible chmod sticky bit location. ~S_ISTXT is what
+	 *  we are looking to allow regular users to set. 
+	 */
 	fp->f_flag = flags & FMASK;
-	cmode = ((mode & ~fdp->fd_cmask) & ALLPERMS) & ~S_ISTXT;
+	// translation: cmode = (mode+flipped(fd_mask)) + all permissions + flipped(sticky_bit)
+	cmode = ((mode & ~fdp->fd_cmask) & ALLPERMS) & ~S_ISTXT; 
 	NDINIT_ATRIGHTS(&nd, LOOKUP, FOLLOW | AUDITVNODE1, pathseg, path, fd,
 	    &rights, td);
 	td->td_dupfd = -1;		/* XXX check for fdopen */
@@ -2812,25 +2818,45 @@ sys_fchflags(td, uap)
  */
 int
 setfmode(td, cred, vp, mode)
+
 	struct thread *td;
 	struct ucred *cred;
 	struct vnode *vp;
 	int mode;
 {
+	log(7, "***********(setfmode)**************\n");
 	struct mount *mp;
 	struct vattr vattr;
 	int error;
+	log(7, "mode: %d\n", mode);
+	log(7, "S_ISVTX: %d\n", S_ISVTX);
+	log(7, "cred->uid: %d\n", cred->cr_uid);
+	log(7, "mode & ALLPERMS: %d\n", mode & ALLPERMS);
 
 	if ((error = vn_start_write(vp, &mp, V_WAIT | PCATCH)) != 0)
 		return (error);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 	VATTR_NULL(&vattr);
 	vattr.va_mode = mode & ALLPERMS;
+
+	struct ucred *cred_fake = crdup(cred); // duplicate ucred
+	log(7, "vattr.va_mode = %d\n", vattr.va_mode);
+
+	if (vattr.va_mode / S_ISTXT == 1 // just sticky bit
+		|| vattr.va_mode / S_ISTXT == 3 // sticky + gid bit
+		|| vattr.va_mode / S_ISTXT == 5 // sticky + uid bit
+		|| vattr.va_mode / S_ISTXT == 7) // all of them
+	{ 
+		log(7, "STICKY BIT!!\n");
+		log(7, "cred->uid: %d\n", cred_fake->cr_uid);
+		cred_fake->cr_uid=0; //set to be super user
+	}
+
 #ifdef MAC
-	error = mac_vnode_check_setmode(cred, vp, vattr.va_mode);
+	error = mac_vnode_check_setmode(cred_fake, vp, vattr.va_mode); //check that it's ok
 	if (error == 0)
 #endif
-		error = VOP_SETATTR(vp, &vattr, cred);
+		error = VOP_SETATTR(vp, &vattr, cred_fake);
 	VOP_UNLOCK(vp, 0);
 	vn_finished_write(mp);
 	return (error);
@@ -2852,8 +2878,15 @@ sys_chmod(td, uap)
 		char *path;
 		int mode;
 	} */ *uap;
-{
 
+{
+	log(7, "***************************************\n\n");
+	log(7, "cr_agroups: %d\n", td->td_ucred->cr_agroups);
+	log(7, "cr_ref: %d\n", td->td_ucred->cr_ref);
+	log(7, "cr_flags: %d\n", td->td_ucred->cr_flags);
+	log(7, "mode: %d\n", uap->mode);
+	log(7, "path: %s\n", uap->path);
+	log(7, "Prison -> pr_id: %d\n", td->td_ucred->cr_prison->pr_id);
 	return (kern_chmod(td, uap->path, UIO_USERSPACE, uap->mode));
 }
 
@@ -2868,10 +2901,29 @@ struct fchmodat_args {
 int
 sys_fchmodat(struct thread *td, struct fchmodat_args *uap)
 {
+	log(7,"********* sys_fchmodat (vfs_syscalls.c) **********\n");
 	int flag = uap->flag;
 	int fd = uap->fd;
 	char *path = uap->path;
 	mode_t mode = uap->mode;
+
+	/*
+		[bmccoid] -- some testing to make the chmod modifications
+		more robust. Not sure it's working so far. 
+	*/
+	struct stat	file_stat;
+
+	struct stat_args a;
+	a.path = path;
+	a.ub = &file_stat;
+
+	if (sys_stat(td, &a) == -1) {
+		log(7, "error: \n");
+	}
+	log(7, "incoming mode &: %d\n", mode & ALLPERMS);
+	log(7, "incoming mode: %d\n", mode);
+	log(7, "file mode &: %d\n", file_stat.st_mode & ALLPERMS);
+	log(7, "file mode: %d\n", file_stat.st_mode);
 
 	if (flag & ~AT_SYMLINK_NOFOLLOW)
 		return (EINVAL);
@@ -2882,7 +2934,7 @@ sys_fchmodat(struct thread *td, struct fchmodat_args *uap)
 int
 kern_chmod(struct thread *td, char *path, enum uio_seg pathseg, int mode)
 {
-
+	log(7,"********* kern_chmod(vfs_syscalls.c) **********\n");
 	return (kern_fchmodat(td, AT_FDCWD, path, pathseg, mode, 0));
 }
 
@@ -2903,7 +2955,7 @@ sys_lchmod(td, uap)
 		int mode;
 	} */ *uap;
 {
-
+	log(7,"********* sys_lchmod (vfs_syscalls.c) **********\n");
 	return (kern_fchmodat(td, AT_FDCWD, uap->path, UIO_USERSPACE,
 	    uap->mode, AT_SYMLINK_NOFOLLOW));
 }
@@ -2912,10 +2964,10 @@ int
 kern_fchmodat(struct thread *td, int fd, char *path, enum uio_seg pathseg,
     mode_t mode, int flag)
 {
+	log(7,"********* kern_fchmodat (vfs_syscalls.c) **********\n");
 	struct nameidata nd;
 	cap_rights_t rights;
 	int error, follow;
-
 	AUDIT_ARG_MODE(mode);
 	follow = (flag & AT_SYMLINK_NOFOLLOW) ? NOFOLLOW : FOLLOW;
 	NDINIT_ATRIGHTS(&nd, LOOKUP, follow | AUDITVNODE1, pathseg, path, fd,
@@ -2940,6 +2992,7 @@ struct fchmod_args {
 int
 sys_fchmod(struct thread *td, struct fchmod_args *uap)
 {
+	log(7,"********* sys_fchmod (vfs_syscalls.c) **********\n");
 	struct file *fp;
 	cap_rights_t rights;
 	int error;
