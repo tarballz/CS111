@@ -24,7 +24,7 @@ echo protect encrypted, protect/unprotect decrypted
 ./setkey 1 1
 ./protectfile -e 1 1 ./base/encrypted.txt
 ./protectfile -e 1 1 ./base/decrypted.txt
-./protectfiel -d 1 1 ./base/decrypted.txt
+./protectfile -d 1 1 ./base/decrypted.txt
 
 # Attempt invalid commands, should raise error
 echo Attempt invalid protects should raise error
