@@ -3,7 +3,9 @@
 
 echo Testing ASGN 4
 echo Be sure to run this command with sudo or as root!
-echo --------------------------------------------------------
+
+echo
+echo Setup --------------------------------------------------
 
 # Get the protecfile program
 echo Build and copy protecfile program
@@ -19,6 +21,9 @@ echo encrypted > base/encrypted.txt
 echo plain     > base/plain.txt
 echo decrypted > base/decrypted.txt
 
+echo
+echo Protectfile ---------------------------------------------
+
 # Encrypt encrypted file
 echo protect encrypted, protect/unprotect decrypted
 ./setkey 1 1
@@ -29,8 +34,11 @@ echo protect encrypted, protect/unprotect decrypted
 # Attempt invalid commands, should raise error
 echo Attempt invalid protects should raise error
 ./protectfile -e 1 1 ./base/encrypted.txt
-./protectfile -d 1 1 ./base/decrpyted.txt
+./protectfile -d 1 1 ./base/decrypted.txt
 ./protectfile -d 1 1 ./base/plain.txt
+
+echo
+echo Cryptofs  -------------------------------------------------
 
 # Mount the cryptofs system
 echo Mount crpytofs
@@ -56,3 +64,8 @@ cat layer/plain.txt
 
 echo reading decrypted from layer, should be plaintext
 cat layer/decrypted.txt
+
+echo
+echo Notes  ----------------------------------------------------
+echo To delete the generated folders run sudo sh cleantest.sh
+echo Please clean before running test again, or else you will get bad results
