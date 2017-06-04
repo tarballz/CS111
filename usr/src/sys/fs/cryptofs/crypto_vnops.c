@@ -812,6 +812,8 @@ crypto_read(struct vop_read_args *ap)
   amnt = amnt - uio->uio_resid;
 
   log(7, "before stickybit/get_key check\n");
+  log(7, "CHECK_STICKY: %d\n", (CHECK_STICKY(va.va_mode)));
+  log(7, "get_key: %d\n", get_key(ap->a_cred->cr_uid, key));
   //encrypt if sticky bit is on
   if ((CHECK_STICKY(va.va_mode) > 0) && get_key(ap->a_cred->cr_uid, key) == 0) {
     printf("sizeof(key): %lu\n", sizeof(key));
