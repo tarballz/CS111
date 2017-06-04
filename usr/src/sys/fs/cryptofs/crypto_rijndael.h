@@ -26,11 +26,6 @@ void rijndaelDecrypt(const unsigned long *rk, int nrounds,
 #define KEYLENGTH(keybits) ((keybits)/8)
 #define RKLENGTH(keybits)  ((keybits)/8+28)
 #define NROUNDS(keybits)   ((keybits)/32+6)
-<<<<<<< HEAD
 #define U_KEYSIZE 16
-=======
-#define KEYSIZE 16
->>>>>>> 226d244db89494d83ce61ac08302821901344956
-
 #endif
 
