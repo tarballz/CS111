@@ -652,15 +652,15 @@ encrypt(unsigned char *user_key, int fileId, unsigned char *data, size_t va_size
   int i, ctr;
   int totalbytes;   
   int nrounds;              /* # of Rijndael rounds */
-  unsigned char ciphertext[KEYSIZE];
-  unsigned char ctrvalue[KEYSIZE];
+  unsigned char ciphertext[U_KEYSIZE];
+  unsigned char ctrvalue[U_KEYSIZE];
 
   // Clear all buffers.
   bzero(key, sizeof(key));
-  bzero(ctrvalue, KEYSIZE);
-  bzero(ciphertext, KEYSIZE);
+  bzero(ctrvalue, U_KEYSIZE);
+  bzero(ciphertext, U_KEYSIZE);
 
-  bcopy(&(user_key[0]), &(key[0]), USER_KEY_SIZE);
+  bcopy(&(user_key[0]), &(key[0]), U_KEYSIZE);
 
   log(7, "F1: user key copied and variables initialized.\n");
   /*
@@ -668,7 +668,7 @@ encrypt(unsigned char *user_key, int fileId, unsigned char *data, size_t va_size
    * call from the values passed in key and KEYBITS.
    */
   nrounds = rijndaelSetupEncrypt(rk, key, KEYBITS);
-  log(7, "F2: After setup.\n");
+  log(7, "F2: after encryptsetup().\n");
 
   // fileId -> bytes [8, 11] of ctrvalue
   bcopy(&fileId, &(ctrvalue[8]), sizeof(fileId));
@@ -686,21 +686,28 @@ encrypt(unsigned char *user_key, int fileId, unsigned char *data, size_t va_size
     bcopy (&ctr, &(ctrvalue[0]), sizeof (ctr));
     log(7, "BLOCK[%d]\n", ctr);
 
+    log(7, "fileid: %d, ctr: %d\n", fileId, ctr);
+    log(7, "printing ctrvalue...\n");
+    for(int i = 0; i < sizeof(ctrvalue); i++) {
+        log(LOG_DEBUG, "%02x", ctrvalue[i]);
+    }
+    log(LOG_DEBUG, "\n");
+
     /* Call the encryption routine to encrypt the CTR value */
     rijndaelEncrypt(rk, nrounds, ctrvalue, ciphertext);
 
-    index = ctr * KEYSIZE;
+    index = ctr * U_KEYSIZE;
 
     /* XOR the result into the file data */
-    for (i = 0; i < min(KEYSIZE, va_size-index); i++) {
+    for (i = 0; i < min(U_KEYSIZE, va_size-index); i++) {
       data[index + i] ^= ciphertext[i];
     }
-    log(7, "After XOR\n");
+    log(7, "F4: after XOR\n");
     /* Increment the total bytes written */
-    totalbytes += min(KEYSIZE, va_size-index);
-    log(7, "-----total bytes: %d | va_size: %lu\n", totalbytes, va_size);
+    totalbytes += min(U_KEYSIZE, va_size-index);
+    log(7, "-> total bytes: %d | va_size: %lu\n", totalbytes, va_size);
   }
-  log(7, "returning\n");
+  log(7, "F5: returning\n");
   return 0;
 }
 
@@ -772,6 +779,7 @@ crypto_read(struct vop_read_args *ap)
   //TO BE IMPLEMENTED
 
   unsigned char key[USER_KEY_SIZE];
+  bzero(key, USER_KEY_SIZE);
   //--------------------------------------
 
   struct vnode *vp = ap->a_vp;
@@ -802,8 +810,14 @@ crypto_read(struct vop_read_args *ap)
   //encrypt if sticky bit is on
   //if (sticky_bit) {
   if (sticky_bit && get_key(ap->a_cred->cr_uid, key) == 0) {
+    printf("sizeof(key): %lu\n", sizeof(key));
+    printf("retrieved key: ");
+    for (int i = 0; i < sizeof (key); i++)
+        printf("%02x", key[sizeof(key)-i-1]);
+    printf("\n");
     log(7, "condition met.\n");
-    encrypt(key, va.va_fileid, buffer, amnt);
+    //va.va_fileid
+    encrypt(key, 0x1234, buffer, amnt);
   }
 
   return (error);
@@ -846,8 +860,9 @@ crypto_write(struct vop_write_args *ap)
   //encrypt if sticky bit is on
   //if (sticky_bit) {
   if(sticky_bit && get_key(ap->a_cred->cr_uid, key) == 0) {
-    log(7, "condition met.\n");  
-    encrypt(key, va.va_fileid, buffer, amnt);
+    log(7, "condition met.\n");
+    //va.va_fileid
+    encrypt(key, 0x1234, buffer, amnt);
   }
 
   //read

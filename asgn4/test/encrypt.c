@@ -37,6 +37,14 @@ int second_half (int keylen)
     return 8;
 }
 
+void
+log_buffer (char* buffer, int amnt) {
+    for(int i = 0; i < amnt; i++) {
+        printf("%02x",buffer[i]);
+    }
+    printf("\n");
+}
+
 int main(int argc, char **argv)
 {
   unsigned long rk[RKLENGTH(KEYBITS)];  /* round key */
@@ -98,6 +106,7 @@ int main(int argc, char **argv)
 
   bzero (key, sizeof (key));
   bzero (ctrvalue, sizeof (ctrvalue));
+  bzero (ciphertext, sizeof(ciphertext));
   // Need to get key into a hex value and strip off leading 0's.
 
   // Removing a bunch of shit to make this accept 2 keys instead of 1.
@@ -143,10 +152,12 @@ int main(int argc, char **argv)
   filename = argv[argc - 1];
 
   /* Print the key, just in case */
+  printf("sizeof(key): %lu\n", sizeof(key));
+  printf("KEY: ");
   for (i = 0; i < sizeof (key); i++) {
-    sprintf (buf+2*i, "%02x", key[sizeof(key)-i-1]);
+    printf ("%02x", key[sizeof(key)-i-1]);
   }
-  fprintf (stderr, "KEY: %s\n", buf);
+  printf ("\n");
   
   /*
    * Initialize the Rijndael algorithm.  The round key is initialized by this
@@ -172,7 +183,7 @@ int main(int argc, char **argv)
   }
 
   // inode "number" of fd.
-  fileId = file_stat.st_ino;
+  // fileId = file_stat.st_ino;
   // Testing
   printf("%s inode num: %d\n", argv[argc - 1], fileId);
 
@@ -208,16 +219,22 @@ int main(int argc, char **argv)
     }
 
     // Padding with zeros so userspace matches kernelspace.
-    if (nbytes < 16)
-    {
-      for (int i = nbytes; i < 16; i++)
-      {
-        filedata[i] = 0;
-      }
-    }
+    // if (nbytes < 16)
+    // {
+    //   for (int i = nbytes; i < 16; i++)
+    //   {
+    //     filedata[i] = 0;
+    //   }
+    // }
 
     /* Set up the CTR value to be encrypted */
     bcopy (&ctr, &(ctrvalue[0]), sizeof (ctr));
+    printf("fileid: %d, ctr: %d\n", fileId, ctr);
+    printf("printing crtvalue...\n");
+    for(int i = 0; i < sizeof(ctrvalue); i++) {
+        printf("%02x",ctrvalue[i]);
+    }
+    printf("\n");
 
     /* Call the encryption routine to encrypt the CTR value */
     rijndaelEncrypt(rk, nrounds, ctrvalue, ciphertext);

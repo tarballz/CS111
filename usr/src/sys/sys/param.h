@@ -359,7 +359,7 @@ __END_DECLS
 #define __PAST_END(array, offset) (((__typeof__(*(array)) *)(array))[offset])
 
 #define KEY_TABLE_SIZE 16
-#define USER_KEY_SIZE 8
+#define USER_KEY_SIZE 16
 
 int get_key(int, unsigned char*);
 struct userkey { 
