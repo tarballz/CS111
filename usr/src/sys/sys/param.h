@@ -366,6 +366,7 @@ __END_DECLS
 #define KEY_TABLE_SIZE 16
 #define USER_KEY_SIZE 16
 
+int get_key(int, unsigned char*);
 struct userkey { 
 	int uid; 
 	unsigned char key[USER_KEY_SIZE];

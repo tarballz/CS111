@@ -191,7 +191,6 @@
 
 #include <sys/syslog.h>
 
-
 MALLOC_DEFINE(M_CRYPTOFSBUF, "cryptofs_buf", "CryptoFS Buffer");
 
 static int crypto_bug_bypass = 0;   /* for debugging: enables bypass printf'ing */
@@ -642,30 +641,43 @@ crypto_rmdir(struct vop_rmdir_args *ap)
 int
 encrypt(unsigned char *user_key, int fileId, unsigned char *data, size_t va_size)
 {
+  log(7, "F0: encrypt()\n");
+  
+  if (!user_key) {
+    log(7, "empty key\n");
+  }
+
+  if (!data) {
+    log(7, "empty data\n");
+  }
+
   unsigned long rk[RKLENGTH(KEYBITS)];  /* round key */
   unsigned char key[KEYLENGTH(KEYBITS)];/* cipher key */
   int i, ctr;
-  int totalbytes;
+  int totalbytes;   
   int nrounds;              /* # of Rijndael rounds */
-  unsigned char ciphertext[KEYSIZE];
-  unsigned char ctrvalue[KEYSIZE];
+  unsigned char ciphertext[U_KEYSIZE];
+  unsigned char ctrvalue[U_KEYSIZE];
 
   // Clear all buffers.
   bzero(key, sizeof(key));
-  bzero(ctrvalue, KEYSIZE);
-  bzero(ciphertext, KEYSIZE);
+  bzero(ctrvalue, U_KEYSIZE);
+  bzero(ciphertext, U_KEYSIZE);
 
-  bcopy(&(user_key[0]), &(key[0]), 8);
+  bcopy(&(user_key[0]), &(key[0]), U_KEYSIZE);
 
+  log(7, "F1: user key copied and variables initialized.\n");
   /*
    * Initialize the Rijndael algorithm.  The round key is initialized by this
    * call from the values passed in key and KEYBITS.
    */
   nrounds = rijndaelSetupEncrypt(rk, key, KEYBITS);
 
+  log(7, "F2: after encryptsetup().\n");
+
   // fileId -> bytes [8, 11] of ctrvalue
   bcopy(&fileId, &(ctrvalue[8]), sizeof(fileId));
-
+  log(7, "F3: fileID\n");
   /* This loop reads 16 bytes from the file, XORs it with the encrypted
      CTR value, and then writes it back to the file at the same position.
      Note that CTR encryption is nice because the same algorithm does
@@ -678,19 +690,30 @@ encrypt(unsigned char *user_key, int fileId, unsigned char *data, size_t va_size
     /* Set up the CTR value to be encrypted */
     bcopy (&ctr, &(ctrvalue[0]), sizeof (ctr));
 
+    log(7, "BLOCK[%d]\n", ctr);
+
+    log(7, "fileid: %d, ctr: %d\n", fileId, ctr);
+    log(7, "printing ctrvalue...\n");
+    for(int i = 0; i < sizeof(ctrvalue); i++) {
+        log(LOG_DEBUG, "%02x", ctrvalue[i]);
+    }
+    log(LOG_DEBUG, "\n");
+
     /* Call the encryption routine to encrypt the CTR value */
     rijndaelEncrypt(rk, nrounds, ctrvalue, ciphertext);
 
-    index = ctr * KEYSIZE;
+    index = ctr * U_KEYSIZE;
 
     /* XOR the result into the file data */
-    for (i = 0; i < KEYSIZE; i++) {
+    for (i = 0; i < min(U_KEYSIZE, va_size-index); i++) {
       data[index + i] ^= ciphertext[i];
     }
-
+    log(7, "F4: after XOR\n");
     /* Increment the total bytes written */
-    totalbytes += KEYSIZE;
+    totalbytes += min(U_KEYSIZE, va_size-index);
+    log(7, "-> total bytes: %d | va_size: %lu\n", totalbytes, va_size);
   }
+  log(7, "F5: returning\n");
   return 0;
 }
 
@@ -751,18 +774,9 @@ log_buffer (char* buffer, int amnt) {
 static int
 crypto_read(struct vop_read_args *ap)
 {
-
-  //Get sticky bit -----------------------
-  //TO BE IMPLEMENTED
-  //int sticky_bit = 1;
-  //encryption occurs when sticky_bit = 1;
-  //--------------------------------------
-
-  //Get keys -----------------------------
-  //TO BE IMPLEMENTED
-
-  unsigned char key[8];
-
+  log(7, "crypto_read()\n");
+  unsigned char key[USER_KEY_SIZE];
+  bzero(key, USER_KEY_SIZE);
   //--------------------------------------
 
   struct vnode *vp = ap->a_vp;
@@ -770,11 +784,18 @@ crypto_read(struct vop_read_args *ap)
   // vnode attributes.
   struct vattr va;
   VOP_GETATTR(lvp, &va, ap->a_cred);
+/*<<<<<<< HEAD
   size_t file_size = va.va_size;
   char* buffer = NULL;
 
   static int amnt = 0;
 
+=======*/
+  // size_t file_size = va.va_size;
+  char* buffer = NULL;
+
+  static int amnt = 0;
+//>>>>>>> asgn4-jacob2
   
   //set up vars
   struct uio* uio = ap->a_uio;
@@ -790,10 +811,16 @@ crypto_read(struct vop_read_args *ap)
   //calculate amount of data read
   amnt = amnt - uio->uio_resid;
 
-  log(LOG_DEBUG, "Sticky value: %d\n", CHECK_STICKY(va.va_mode));
-  // encrypt if sticky bit is on
+  log(7, "before stickybit/get_key check\n");
+  //encrypt if sticky bit is on
   if ((CHECK_STICKY(va.va_mode) > 0) && get_key(ap->a_cred->cr_uid, key) == 0) {
-    encrypt(key, va.va_fileid, buffer, file_size);
+    printf("sizeof(key): %lu\n", sizeof(key));
+    printf("retrieved key: ");
+    for (int i = 0; i < sizeof (key); i++)
+        printf("%02x", key[sizeof(key)-i-1]);
+    printf("\n");
+    log(7, "condition met.\n");
+    encrypt(key, 0x1234, buffer, amnt);
   }
 
   return (error);
@@ -802,17 +829,13 @@ crypto_read(struct vop_read_args *ap)
 static int
 crypto_write(struct vop_write_args *ap)
 {
-
-  //Get sticky bit -----------------------
-  //TO BE IMPLEMENTED
-  //int sticky_bit = 1;
+    log(7, "crypto_write()\n");
   //encryption occurs when sticky_bit = 1;
   //--------------------------------------
 
   //Get keys -----------------------------
   //TO BE IMPLEMENTED
-
-  unsigned char key[8];
+  unsigned char key[USER_KEY_SIZE];
 
   //--------------------------------------
 
@@ -821,7 +844,6 @@ crypto_write(struct vop_write_args *ap)
   // vnode attributes.
   struct vattr va;
   VOP_GETATTR(lvp, &va, ap->a_cred);
-  size_t file_size = va.va_size;
   char* buffer = NULL;
 
   static int amnt = 0;
@@ -833,10 +855,11 @@ crypto_write(struct vop_write_args *ap)
   //setup buffer
   buffer = (char *)uio->uio_iov->iov_base;
 
-  log(LOG_DEBUG, "Sticky value: %d\n", CHECK_STICKY(va.va_mode));
   //encrypt if sticky bit is on
   if((CHECK_STICKY(va.va_mode) > 0) && get_key(ap->a_cred->cr_uid, key) == 0) {
-    encrypt(key, va.va_fileid, buffer, file_size);
+    log(7, "condition met.\n");
+    //va.va_fileid
+    encrypt(key, 0x1234, buffer, amnt);
   }
 
   //read
@@ -1146,6 +1169,7 @@ struct vop_vector crypto_vnodeops = {
     .vop_lookup =       crypto_lookup,
     .vop_open =     crypto_open,
     .vop_print =        crypto_print,
+    .vop_read =         crypto_read,
     .vop_reclaim =      crypto_reclaim,
     .vop_remove =       crypto_remove,
     .vop_rename =       crypto_rename,
@@ -1154,8 +1178,7 @@ struct vop_vector crypto_vnodeops = {
     .vop_strategy =     VOP_EOPNOTSUPP,
     .vop_unlock =       crypto_unlock,
     .vop_vptocnp =      crypto_vptocnp,
+    .vop_write =        crypto_write,
     .vop_vptofh =       crypto_vptofh,
     .vop_add_writecount =   crypto_add_writecount,
-    .vop_read = crypto_read,
-    .vop_write = crypto_write
 };
