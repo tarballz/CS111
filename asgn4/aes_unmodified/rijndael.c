@@ -12,13 +12,9 @@
 
 #define FULL_UNROLL
 
-#include "crypto_rijndael.h"
+#include "rijndael.h"
 
-<<<<<<< HEAD
-// static char rcsid[] = "$Id: rijndael.c,v 1.1 2003/04/15 00:22:49 elm Exp elm $";
-=======
 static char rcsid[] = "$Id: rijndael.c,v 1.1 2003/04/15 00:22:49 elm Exp elm $";
->>>>>>> 226d244db89494d83ce61ac08302821901344956
 
 typedef unsigned long u32;
 typedef unsigned char u8;

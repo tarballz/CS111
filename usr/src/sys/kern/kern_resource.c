@@ -129,11 +129,17 @@ sys_setkey(td, uap)
 	bcopy(&(uap->k1), &(new_key[sizeof(uap->k0)]), sizeof(uap->k1));
 	bcopy(&(new_key[0]), &(key_table[index].key[0]), USER_KEY_SIZE);
 	
+<<<<<<< HEAD
 	printf("sizeof(new_key): %lu\n", sizeof(new_key));
 	printf("setkey(): ");
   	for (int i = 0; i < sizeof (new_key); i++)
     	printf("%02x", new_key[sizeof(new_key)-i-1]);
   	printf("\n");
+=======
+  	// for (int i = 0; i < sizeof (new_key); i++)
+   //  	printf("%02x", new_key[sizeof(new_key)-i-1]);
+  	// printf("\n");
+>>>>>>> 226d244db89494d83ce61ac08302821901344956
 
 	return (0);
 }
@@ -143,12 +149,16 @@ get_key(int uid, unsigned char *k)
 {
 	for(int i=0; i<=last_entry; i++) {
 		if (key_table[i].uid == uid) {
+<<<<<<< HEAD
 			printf("sizeof(k): %lu\n", sizeof(k));
 			printf("FOUND KEY: ");
 			bcopy(&(key_table[i].key[0]), k, USER_KEY_SIZE);
 			for (int i = 0; i < USER_KEY_SIZE; i++)
     			printf("%02x", k[(USER_KEY_SIZE)-i-1]);
 		  	printf("\n");
+=======
+			bcopy(&(key_table[i].key[0]), &(k[0]), USER_KEY_SIZE);
+>>>>>>> 226d244db89494d83ce61ac08302821901344956
 			return 0;
 		}
 	}
