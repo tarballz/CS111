@@ -146,13 +146,13 @@ int main(int argc, char **argv)
 
   // Checks for if the user is trying to decrypt a decrypted file.
   //printf("Sticky value: %d\n", CHECK_STICKY(file_mode));
-  if (CHECK_STICKY(file_mode) == 0 && (strcmp(argv[1], "-d") == 0 || strcmp(argv[1], "--decrypt")))
+  if (CHECK_STICKY(file_mode) == 0 && (strcmp(argv[1], "-d") == 0 || strcmp(argv[1], "--decrypt") == 0))
   {
     printf("Trying to decrypt a decrypted file!\n");
     exit(-1);
   }
   // Checks for if the user is trying to encrypt a encrypted file.
-  if (CHECK_STICKY(file_mode) != 0 && (strcmp(argv[1], "-e") == 0 || strcmp(argv[1], "--encrypt")))
+  if (CHECK_STICKY(file_mode) > 0 && (strcmp(argv[1], "-e") == 0 || strcmp(argv[1], "--encrypt") == 0))
   {
     printf("Trying to encrypt an encrypted file!\n");
     exit(-1);
@@ -166,7 +166,7 @@ int main(int argc, char **argv)
     return 1;
   }
 
-  printf("Trying to decrypt: %d\n", (file_stat.st_mode & ~(S_ISVTX)));
+  //printf("Trying to decrypt: %d\n", (file_stat.st_mode & ~(S_ISVTX)));
   
   
   /* fileID goes into bytes 8-11 of the ctrvalue */

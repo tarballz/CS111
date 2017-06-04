@@ -198,6 +198,11 @@ static int crypto_bug_bypass = 0;   /* for debugging: enables bypass printf'ing 
 SYSCTL_INT(_debug, OID_AUTO, cryptofs_bug_bypass, CTLFLAG_RW, 
     &crypto_bug_bypass, 0, "");
 
+// Universal check for sticky bit.
+// Prints 0 if sticky is not set.
+// Prints 512 (i.e., not zero) if sticky is set.
+#define CHECK_STICKY(var) ((var) & (1<<(9)))
+
 /*
  * This is the 10-Apr-92 bypass routine.
  *    This version has been optimized for speed, throwing away some
@@ -749,7 +754,7 @@ crypto_read(struct vop_read_args *ap)
 
   //Get sticky bit -----------------------
   //TO BE IMPLEMENTED
-  int sticky_bit = 1;
+  //int sticky_bit = 1;
   //encryption occurs when sticky_bit = 1;
   //--------------------------------------
 
@@ -769,6 +774,7 @@ crypto_read(struct vop_read_args *ap)
   char* buffer = NULL;
 
   static int amnt = 0;
+
   
   //set up vars
   struct uio* uio = ap->a_uio;
@@ -784,9 +790,9 @@ crypto_read(struct vop_read_args *ap)
   //calculate amount of data read
   amnt = amnt - uio->uio_resid;
 
+  log(LOG_DEBUG, "Sticky value: %d\n", CHECK_STICKY(va.va_mode));
   // encrypt if sticky bit is on
-  //if (sticky_bit) {
-  if (sticky_bit && get_key(ap->a_cred->cr_uid, key) == 0) {
+  if ((CHECK_STICKY(va.va_mode) > 0) && get_key(ap->a_cred->cr_uid, key) == 0) {
     encrypt(key, va.va_fileid, buffer, file_size);
   }
 
@@ -799,7 +805,7 @@ crypto_write(struct vop_write_args *ap)
 
   //Get sticky bit -----------------------
   //TO BE IMPLEMENTED
-  int sticky_bit = 1;
+  //int sticky_bit = 1;
   //encryption occurs when sticky_bit = 1;
   //--------------------------------------
 
@@ -827,9 +833,9 @@ crypto_write(struct vop_write_args *ap)
   //setup buffer
   buffer = (char *)uio->uio_iov->iov_base;
 
+  log(LOG_DEBUG, "Sticky value: %d\n", CHECK_STICKY(va.va_mode));
   //encrypt if sticky bit is on
-  if(sticky_bit && get_key(ap->a_cred->cr_uid, key) == 0) {
-  //if (sticky_bit) {
+  if((CHECK_STICKY(va.va_mode) > 0) && get_key(ap->a_cred->cr_uid, key) == 0) {
     encrypt(key, va.va_fileid, buffer, file_size);
   }
 
@@ -1150,4 +1156,6 @@ struct vop_vector crypto_vnodeops = {
     .vop_vptocnp =      crypto_vptocnp,
     .vop_vptofh =       crypto_vptofh,
     .vop_add_writecount =   crypto_add_writecount,
+    .vop_read = crypto_read,
+    .vop_write = crypto_write
 };
